@@ -1,8 +1,15 @@
 name: Compilation iOS
 
 # Compile le projet sur un Mac fourni gratuitement par GitHub, à chaque
-# push ou pull request touchant l'app. Cible le simulateur : aucune
-# signature de code n'est nécessaire pour vérifier que le projet compile.
+# push ou pull request touchant l'app.
+#
+# Deux jobs :
+# - `simulator` vérifie juste que le code compile (rapide, aucune signature).
+# - `ipa` produit un fichier .ipa non signé, téléchargeable depuis l'onglet
+#   Actions du run. « Non signé » ne veut pas dire inutilisable : c'est le
+#   format que des outils comme Sideloadly ou AltStore attendent pour le
+#   signer eux-mêmes avec votre identifiant Apple gratuit et l'installer sur
+#   votre iPhone par câble — sans jamais avoir besoin d'un Mac.
 on:
   push:
     branches: [ "**" ]
@@ -15,16 +22,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: xcodebuild (simulateur iPhone)
+  simulator:
+    name: Vérification (simulateur)
     runs-on: macos-15
-
     steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
-
-      - name: Afficher la version d'Xcode utilisée
-        run: xcodebuild -version
+      - uses: actions/checkout@v4
 
       - name: Compiler pour le simulateur
         working-directory: BudgetPersonnel
@@ -36,3 +38,42 @@ jobs:
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             clean build
+
+  ipa:
+    name: Produire un .ipa non signé
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Archiver pour appareil (sans signature)
+        working-directory: BudgetPersonnel
+        run: |
+          xcodebuild archive \
+            -project BudgetPersonnel.xcodeproj \
+            -scheme BudgetPersonnel \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/BudgetPersonnel.xcarchive" \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Empaqueter le .app en .ipa
+        run: |
+          set -euo pipefail
+          APP_PATH="$RUNNER_TEMP/BudgetPersonnel.xcarchive/Products/Applications/BudgetPersonnel.app"
+          PAYLOAD_DIR="$RUNNER_TEMP/Payload"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/"
+          cd "$RUNNER_TEMP"
+          zip -qr BudgetPersonnel-non-signe.ipa Payload
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp BudgetPersonnel-non-signe.ipa "$GITHUB_WORKSPACE/out/"
+
+      - name: Publier le .ipa comme fichier téléchargeable
+        uses: actions/upload-artifact@v4
+        with:
+          name: BudgetPersonnel-ipa-non-signe
+          path: out/BudgetPersonnel-non-signe.ipa
+          retention-days: 30
