@@ -1,0 +1,38 @@
+name: Compilation iOS
+
+# Compile le projet sur un Mac fourni gratuitement par GitHub, à chaque
+# push ou pull request touchant l'app. Cible le simulateur : aucune
+# signature de code n'est nécessaire pour vérifier que le projet compile.
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - "BudgetPersonnel/**"
+      - ".github/workflows/ios-build.yml"
+  pull_request:
+    paths:
+      - "BudgetPersonnel/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: xcodebuild (simulateur iPhone)
+    runs-on: macos-15
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Afficher la version d'Xcode utilisée
+        run: xcodebuild -version
+
+      - name: Compiler pour le simulateur
+        working-directory: BudgetPersonnel
+        run: |
+          xcodebuild \
+            -project BudgetPersonnel.xcodeproj \
+            -scheme BudgetPersonnel \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
