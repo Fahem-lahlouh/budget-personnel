@@ -1,0 +1,159 @@
+/*
+ * Jetons visuels de Budget Personnel.
+ *
+ * Le mode sombre n'est pas une inversion : chaque couleur a sa propre valeur,
+ * choisie pour rester lisible sur son fond. Les six teintes catégorielles ont
+ * été validées (bande de clarté, chroma, séparation daltonisme deutan/tritan,
+ * plancher vision normale, contraste sur la surface) dans les deux modes.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Fonds & surfaces */
+  --bg: #f3f4f8;
+  --surface: #ffffff;
+  --surface-raised: #f5f6fa;
+  --surface-sunken: #eceef4;
+  --hairline: rgb(17 19 26 / 8%);
+  --overlay: rgb(12 14 20 / 42%);
+
+  /* Texte */
+  --text-primary: #0d0f14;
+  --text-secondary: #69707e;
+  --text-tertiary: #9aa0ac;
+  --text-on-accent: #ffffff;
+
+  /* Accent & sémantique */
+  --accent: #5b4be0;
+  --accent-strong: #4436c4;
+  --accent-soft: rgb(91 75 224 / 12%);
+  --positive: #0f7a54;
+  --positive-soft: rgb(15 122 84 / 12%);
+  --warning: #a85708;
+  --warning-soft: rgb(168 87 8 / 13%);
+  --negative: #be2639;
+  --negative-soft: rgb(190 38 57 / 12%);
+
+  /* Palette catégorielle — ordre fixe, jamais cyclé */
+  --cat-1: #5b4be0;
+  --cat-2: #c87a06;
+  --cat-3: #00889b;
+  --cat-4: #c42b6b;
+  --cat-5: #5aa234;
+  --cat-6: #8b4fd4;
+  /* Neutre réservé au regroupement « Autres » : jamais une teinte de série. */
+  --cat-other: #7c8494;
+
+  /* Élévation */
+  --shadow-card: 0 8px 18px rgb(16 20 32 / 5%), 0 1px 2px rgb(16 20 32 / 4%);
+  --shadow-raised: 0 16px 40px rgb(16 20 32 / 14%);
+  --card-border: 0.5px solid var(--hairline);
+
+  /* Rayons — un rayon de carte, décliné en plus petit pour l'imbriqué */
+  --radius-card: 22px;
+  --radius-inner: 14px;
+  --radius-chip: 12px;
+  --radius-pill: 999px;
+
+  /* Rythme */
+  --gutter: 18px;
+  --gap: 14px;
+  --pad-card: 18px;
+
+  /* Zones sûres iPhone (encoche, Dynamic Island, barre Home) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --tabbar-height: 56px;
+
+  /* Mouvement */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-fast: 160ms;
+  --dur: 260ms;
+  --dur-slow: 420ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0a0b0f;
+    --surface: #15171d;
+    --surface-raised: #1e212a;
+    --surface-sunken: #101218;
+    --hairline: rgb(255 255 255 / 10%);
+    --overlay: rgb(0 0 0 / 60%);
+
+    --text-primary: #f4f5f7;
+    --text-secondary: #9ca3b0;
+    --text-tertiary: #6c7280;
+
+    --accent: #8e7dff;
+    --accent-strong: #6f5cf0;
+    --accent-soft: rgb(142 125 255 / 20%);
+    --positive: #3dd9a0;
+    --positive-soft: rgb(61 217 160 / 18%);
+    --warning: #f7b94a;
+    --warning-soft: rgb(247 185 74 / 18%);
+    --negative: #ff6b72;
+    --negative-soft: rgb(255 107 114 / 18%);
+
+    --cat-1: #7b6bf0;
+    --cat-2: #c4801a;
+    --cat-3: #109aae;
+    --cat-4: #d9497f;
+    --cat-5: #62a238;
+    --cat-6: #a268e8;
+    --cat-other: #79818f;
+
+    /* Sur fond sombre une ombre noire ne se voit pas : c'est le liseré qui
+       crée l'élévation. */
+    --shadow-card: none;
+    --shadow-raised: 0 20px 48px rgb(0 0 0 / 55%);
+    --card-border: 1px solid var(--hairline);
+  }
+}
+
+/* Choix explicite de l'utilisateur : il l'emporte dans les deux sens. */
+:root[data-theme='dark'] {
+  --bg: #0a0b0f;
+  --surface: #15171d;
+  --surface-raised: #1e212a;
+  --surface-sunken: #101218;
+  --hairline: rgb(255 255 255 / 10%);
+  --overlay: rgb(0 0 0 / 60%);
+
+  --text-primary: #f4f5f7;
+  --text-secondary: #9ca3b0;
+  --text-tertiary: #6c7280;
+
+  --accent: #8e7dff;
+  --accent-strong: #6f5cf0;
+  --accent-soft: rgb(142 125 255 / 20%);
+  --positive: #3dd9a0;
+  --positive-soft: rgb(61 217 160 / 18%);
+  --warning: #f7b94a;
+  --warning-soft: rgb(247 185 74 / 18%);
+  --negative: #ff6b72;
+  --negative-soft: rgb(255 107 114 / 18%);
+
+  --cat-1: #7b6bf0;
+  --cat-2: #c4801a;
+  --cat-3: #109aae;
+  --cat-4: #d9497f;
+  --cat-5: #62a238;
+  --cat-6: #a268e8;
+  --cat-other: #79818f;
+
+  --shadow-card: none;
+  --shadow-raised: 0 20px 48px rgb(0 0 0 / 55%);
+  --card-border: 1px solid var(--hairline);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

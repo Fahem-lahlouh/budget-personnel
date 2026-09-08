@@ -1,0 +1,304 @@
+/* MARK: - Donut */
+
+.donut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.donut__figure {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.donut__arc {
+  transition:
+    stroke-width var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+
+.donut__center {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  max-width: 120px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.donut__center-label {
+  overflow: hidden;
+  max-width: 110px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donut__center-share {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-tertiary);
+}
+
+.donut__legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.donut__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 32px;
+  text-align: left;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.donut__legend-item[aria-pressed='false']:not(:hover) {
+  opacity: 1;
+}
+
+.donut__legend-item.is-active .donut__legend-name {
+  font-weight: 650;
+}
+
+.donut__swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.donut__legend-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donut__legend-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* MARK: - Barres */
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bars__plot {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  align-items: end;
+  height: 176px;
+}
+
+.bars__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0;
+}
+
+.bars__value {
+  height: 14px;
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.bars__track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  width: 100%;
+}
+
+.bars__bar {
+  width: 60%;
+  max-width: 20px;
+  min-height: 0;
+  background: var(--cat-1);
+  /* Extrémités arrondies côté données, ancrées à la ligne de base. */
+  border-radius: 4px 4px 0 0;
+  opacity: 0.42;
+  transition:
+    height var(--dur-slow) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+
+.bars__bar.is-highlight,
+.bars__col.is-active .bars__bar {
+  opacity: 1;
+}
+
+.bars__bar--thin {
+  width: 44%;
+  max-width: 9px;
+  opacity: 0.85;
+}
+
+.bars__col.is-active .bars__bar--thin {
+  opacity: 1;
+}
+
+.bars__track--pair {
+  gap: 2px;
+}
+
+.bars__label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* MARK: - Barre empilée */
+
+.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stacked__track {
+  display: flex;
+  gap: 2px;
+  height: 16px;
+  overflow: hidden;
+}
+
+.stacked__segment {
+  height: 100%;
+  border-radius: 4px;
+  transition: width var(--dur-slow) var(--ease);
+}
+
+.stacked__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stacked__legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.stacked__legend-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stacked__legend-share {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stacked__legend-value {
+  min-width: 82px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* MARK: - Communs */
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  list-style: none;
+}
+
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-legend__swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.chart-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.chart-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+.chart-table summary {
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.chart-table table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+}
+
+.chart-table th,
+.chart-table td {
+  padding: 6px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.chart-table thead th {
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.chart-table tbody th {
+  font-weight: 500;
+  text-align: left;
+}

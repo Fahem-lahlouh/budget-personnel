@@ -1,0 +1,207 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field__label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.field__input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid transparent;
+  border-radius: var(--radius-inner);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.field__input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.field__input--multiline {
+  resize: vertical;
+  min-height: 76px;
+}
+
+.amount-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.amount-input__label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.amount-input__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.amount-input__field {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  background: var(--surface-raised);
+  border: 1px solid transparent;
+  border-radius: var(--radius-inner);
+  text-align: right;
+  font-weight: 620;
+}
+
+.amount-input__field:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.amount-input__unit {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.amount-input--hero {
+  align-items: center;
+  text-align: center;
+}
+
+.amount-input--hero .amount-input__row {
+  justify-content: center;
+  align-items: baseline;
+}
+
+.amount-input--hero .amount-input__field {
+  flex: 0 0 auto;
+  min-width: 1ch;
+  max-width: 100%;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--hairline);
+  border-radius: 0;
+  font-size: 42px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.amount-input--hero .amount-input__field:focus {
+  border-bottom-color: var(--accent);
+}
+
+.amount-input--hero .amount-input__unit {
+  font-size: 24px;
+}
+
+.amount-input__hint {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.segmented {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-inner);
+}
+
+.segmented__option {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: calc(var(--radius-inner) - 3px);
+  font-size: 14px;
+  font-weight: 570;
+  color: var(--text-secondary);
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.segmented__option.is-active {
+  color: var(--text-primary);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.switch-row.is-disabled {
+  opacity: 0.5;
+}
+
+.switch-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.switch-row__label {
+  font-size: 15px;
+}
+
+.switch-row__desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* Interrupteur façon iOS, construit sur une vraie case à cocher pour rester
+   accessible au clavier et aux lecteurs d'écran. */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 51px;
+  height: 31px;
+  margin: 0;
+  appearance: none;
+  background: var(--surface-raised);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgb(0 0 0 / 22%);
+  transition: transform var(--dur) var(--ease);
+}
+
+.switch:checked {
+  background: var(--accent);
+}
+
+.switch:checked::after {
+  transform: translateX(20px);
+}
+
+.switch:disabled {
+  cursor: not-allowed;
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover : indispensable pour que env(safe-area-inset-*)
+         renvoie autre chose que 0 sur iPhone à encoche / Dynamic Island. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5"
+    />
+    <!-- La couleur de la barre d'état suit le thème ; deux déclarations pour
+         que Safari choisisse la bonne selon le mode clair/sombre du système. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F4F8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A0B0F" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Budget" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Suivi de budget personnel, 100 % hors ligne. Vos données restent sur votre appareil."
+    />
+    <!-- Aucune donnée ne sort de l'appareil : la CSP interdit toute connexion
+         sortante autre que vers l'origine de l'app elle-même. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'"
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <title>Budget Personnel</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      Budget Personnel a besoin de JavaScript pour fonctionner. Activez-le dans les
+      réglages de votre navigateur.
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

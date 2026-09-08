@@ -1,0 +1,44 @@
+.update-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 14px);
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(440px, calc(100vw - 28px));
+  padding: 11px 12px 11px 16px;
+  background: var(--surface);
+  border: var(--card-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-raised);
+  transform: translateX(-50%);
+  animation: toast-in var(--dur) var(--ease);
+}
+
+.update-prompt--info {
+  color: var(--positive);
+}
+
+.update-prompt__text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-primary);
+}
+
+.update-prompt .btn {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.update-prompt__close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-tertiary);
+}

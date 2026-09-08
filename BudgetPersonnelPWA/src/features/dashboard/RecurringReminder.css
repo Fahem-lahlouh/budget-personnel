@@ -1,0 +1,71 @@
+.reminder__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reminder__item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 0;
+}
+
+.reminder__item + .reminder__item {
+  border-top: 1px solid var(--hairline);
+}
+
+.reminder__dot {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+.reminder__dot.is-missing {
+  color: var(--text-tertiary);
+  background: var(--surface-raised);
+}
+
+.reminder__dot.is-pending {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.reminder__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reminder__name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminder__meta {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminder__buttons {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.reminder__buttons .icon-btn {
+  width: 34px;
+  height: 34px;
+}
