@@ -1,0 +1,35 @@
+.amount {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.amount--hero {
+  font-size: 33px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.amount--tile {
+  font-size: 22px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+
+.amount--row {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.amount--caption {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.amount--default { color: var(--text-primary); }
+.amount--positive { color: var(--positive); }
+.amount--warning { color: var(--warning); }
+.amount--negative { color: var(--negative); }
+.amount--accent { color: var(--accent); }
+.amount--muted { color: var(--text-tertiary); }

@@ -1,0 +1,67 @@
+.pin-dots {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+}
+
+.pin-dots__dot {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--text-tertiary);
+  border-radius: 50%;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.pin-dots__dot.is-filled {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.12);
+}
+
+.pin-dots.has-error .pin-dots__dot {
+  border-color: var(--negative);
+}
+
+.pin-dots.has-error .pin-dots__dot.is-filled {
+  background: var(--negative);
+}
+
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 20px;
+  width: min(300px, 100%);
+  margin: 0 auto;
+}
+
+.pin-pad__key {
+  display: grid;
+  place-items: center;
+  height: 64px;
+  background: var(--surface);
+  border: 0.5px solid var(--hairline);
+  border-radius: 50%;
+  font-size: 26px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.pin-pad__key:active {
+  transform: scale(0.92);
+  background: var(--surface-raised);
+}
+
+.pin-pad__key:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.pin-pad__key--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}

@@ -1,0 +1,78 @@
+name: Déploiement PWA
+
+# Compile la PWA et la publie sur GitHub Pages.
+#
+# Le `base` de Vite vaut « /budget-personnel/ » (le nom du dépôt), ce qui aligne les
+# assets, le manifest et le scope du service worker sur le sous-chemin servi
+# par GitHub Pages. Pour un domaine personnalisé, définir VITE_BASE=/ ici.
+on:
+  push:
+    branches: [master, main, 'claude/**']
+    paths:
+      - 'BudgetPersonnelPWA/**'
+      - '.github/workflows/pwa-deploy.yml'
+  pull_request:
+    paths:
+      - 'BudgetPersonnelPWA/**'
+  workflow_dispatch:
+
+# Droits minimaux : lecture du dépôt, écriture sur Pages, jeton OIDC pour le
+# déploiement. Rien d'autre.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un déploiement à la fois ; on ne coupe pas un déploiement en cours.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: BudgetPersonnelPWA
+
+jobs:
+  build:
+    name: Qualité et build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: BudgetPersonnelPWA/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests unitaires
+        run: npm test
+
+      - name: Build de production
+        run: npm run build
+
+      # Le déploiement n'a lieu que depuis une branche : sur une pull request,
+      # on s'arrête après avoir vérifié que tout compile et que les tests passent.
+      - name: Préparer l'artefact Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: BudgetPersonnelPWA/dist
+
+  deploy:
+    name: Publication sur GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,91 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 10px;
+}
+
+.chip-grid {
+  display: grid;
+  /* Deux colonnes sur téléphone : à trois, « Télécommunications » et
+     « Équipements » se retrouvaient tronqués en « Télécom… ». */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px;
+  background: var(--surface-raised);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-secondary);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip:active {
+  transform: scale(0.96);
+}
+
+.chip.is-selected {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.editor__disclosure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.editor__details {
+  padding-top: 4px;
+  animation: details-in var(--dur) var(--ease);
+}
+
+@keyframes details-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.editor__confirm {
+  padding: 14px;
+  background: var(--negative-soft);
+  border-radius: var(--radius-inner);
+  text-align: center;
+}
+
+.editor__confirm p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.editor__confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}

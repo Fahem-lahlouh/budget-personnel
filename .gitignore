@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+.DS_Store
