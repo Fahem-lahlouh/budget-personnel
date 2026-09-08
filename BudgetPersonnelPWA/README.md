@@ -16,10 +16,10 @@ limite des 7 jours ici, puisqu'il n'y a pas de signature de code.
 ```bash
 cd BudgetPersonnelPWA
 npm install
-npm run dev      # http://localhost:5173/fahem_c-/
+npm run dev      # http://localhost:5173/budget-personnel/
 ```
 
-> Le serveur de développement sert l'app sous `/fahem_c-/`, exactement comme
+> Le serveur de développement sert l'app sous `/budget-personnel/`, exactement comme
 > GitHub Pages : le scope du service worker et le `start_url` du manifest en
 > dépendent, et une incohérence entre dev et production casserait
 > l'installation à l'écran d'accueil.
@@ -199,7 +199,7 @@ npm ci → lint → tests → build → déploiement Pages
 L'URL sera :
 
 ```
-https://fahem-lahlouh.github.io/fahem_c-/
+https://fahem-lahlouh.github.io/budget-personnel/
 ```
 
 > **Branche de déploiement.** L'environnement `github-pages` restreint par
