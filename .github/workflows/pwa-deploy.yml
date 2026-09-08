@@ -2,7 +2,7 @@ name: Déploiement PWA
 
 # Compile la PWA et la publie sur GitHub Pages.
 #
-# Le `base` de Vite vaut « /fahem_c-/ » (le nom du dépôt), ce qui aligne les
+# Le `base` de Vite vaut « /budget-personnel/ » (le nom du dépôt), ce qui aligne les
 # assets, le manifest et le scope du service worker sur le sous-chemin servi
 # par GitHub Pages. Pour un domaine personnalisé, définir VITE_BASE=/ ici.
 on:
