@@ -1,0 +1,191 @@
+.import-flow__picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 16px;
+  text-align: center;
+}
+
+.import-flow__picker-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.import-flow__hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 280px;
+}
+
+.import-flow__progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 32px 16px;
+}
+
+.import-flow__progress-ring {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  background: conic-gradient(var(--accent) calc(var(--pct) * 1%), var(--surface-raised) 0);
+}
+
+.import-flow__progress-inner {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.import-flow__progress-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.review-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-summary__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.review-row {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: var(--card-border);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-row--duplicate {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--hairline));
+}
+
+.review-row--ignored {
+  opacity: 0.55;
+}
+
+.review-row__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-row__label {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+
+.review-row__raw {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.review-row__badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.review-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.review-row__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-row__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--hairline);
+}
+
+.review-row__form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.review-row__memorize {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.import-flow__footer {
+  padding-top: 4px;
+}
+
+/* Liste de choix simple (partagée avec le sélecteur catégorie/enseigne des dépenses). */
+.picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.picker-list__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 4px;
+  border: none;
+  background: none;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 15px;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.picker-list__row:last-child {
+  border-bottom: none;
+}

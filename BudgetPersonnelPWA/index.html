@@ -22,10 +22,13 @@
       content="Suivi de budget personnel, 100 % hors ligne. Vos données restent sur votre appareil."
     />
     <!-- Aucune donnée ne sort de l'appareil : la CSP interdit toute connexion
-         sortante autre que vers l'origine de l'app elle-même. -->
+         sortante autre que vers l'origine de l'app elle-même. `worker-src` et
+         `wasm-unsafe-eval` servent uniquement le moteur OCR local (Tesseract.js,
+         qui tourne dans un Worker et compile du WebAssembly) — toujours depuis
+         des fichiers auto-hébergés sous /tesseract et /tessdata, jamais un CDN. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'"
+      content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'"
     />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />

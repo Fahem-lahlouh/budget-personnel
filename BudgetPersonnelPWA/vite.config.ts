@@ -49,11 +49,29 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Moteur OCR auto-hébergé : volumineux, jamais nécessaire avant un
+        // import, mis en cache à la demande via `runtimeCaching` ci-dessous.
+        globIgnores: ['**/tesseract/**', '**/tessdata/**'],
         // L'app est une SPA : toute navigation retombe sur index.html, ce qui
         // la rend utilisable hors ligne quelle que soit l'URL ouverte.
         navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [/^\/api/],
         cleanupOutdatedCaches: true,
+        // Les moteurs OCR (wasm) et le modèle de langue française sont volumineux
+        // (~7 Mo) : on ne les précache pas à l'installation, mais on les met en
+        // cache dès leur premier téléchargement pour un import hors ligne ensuite.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.includes('/tesseract/') || url.pathname.includes('/tessdata/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ocr-engine',
+              expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
       devOptions: { enabled: false },
     }),
