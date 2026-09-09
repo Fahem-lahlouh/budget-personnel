@@ -302,6 +302,64 @@ export function varianceOf(expense: Pick<Expense, 'amount' | 'plannedAmount'>): 
   return variance === 0 ? null : variance
 }
 
+// MARK: - Détail par catégorie / enseigne
+
+export interface EntityDetailSummary {
+  /** Somme des montants prévus renseignés (`null` exclus). */
+  plannedTotal: number
+  /** Somme des dépenses déjà réglées. */
+  paidTotal: number
+  /** Somme des dépenses encore à payer. */
+  remainingToPay: number
+  /** Dépensé réel, réglé ou non : `paidTotal + remainingToPay` par construction. */
+  actualTotal: number
+  count: number
+}
+
+const EMPTY_DETAIL: EntityDetailSummary = {
+  plannedTotal: 0,
+  paidTotal: 0,
+  remainingToPay: 0,
+  actualTotal: 0,
+  count: 0,
+}
+
+/**
+ * Détail d'une catégorie sur un ensemble de dépenses (typiquement déjà borné
+ * à un mois). Fonction pure, appelée depuis l'écran de filtre par catégorie —
+ * jamais recalculée à la main dans un composant.
+ */
+export function categoryDetailSummary(expenses: Expense[], categoryId: string): EntityDetailSummary {
+  return detailSummary(expenses.filter((e) => e.categoryId === categoryId))
+}
+
+/** Équivalent de `categoryDetailSummary` pour une enseigne. */
+export function merchantDetailSummary(expenses: Expense[], merchantId: string): EntityDetailSummary {
+  return detailSummary(expenses.filter((e) => e.merchantId === merchantId))
+}
+
+function detailSummary(rows: Expense[]): EntityDetailSummary {
+  if (rows.length === 0) return EMPTY_DETAIL
+
+  let plannedTotal = 0
+  let paidTotal = 0
+  let remainingToPay = 0
+
+  for (const expense of rows) {
+    if (expense.plannedAmount !== null) plannedTotal += expense.plannedAmount
+    if (expense.status === 'paye') paidTotal += expense.amount
+    else remainingToPay += expense.amount
+  }
+
+  return {
+    plannedTotal,
+    paidTotal,
+    remainingToPay,
+    actualTotal: paidTotal + remainingToPay,
+    count: rows.length,
+  }
+}
+
 // MARK: - Regroupements
 
 /** Top N + regroupement du reste sous « Autres », pour le donut. */

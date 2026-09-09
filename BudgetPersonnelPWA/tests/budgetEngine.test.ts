@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   adviceFor,
+  categoryDetailSummary,
+  merchantDetailSummary,
   paceProjection,
   plannedAmountFor,
   recurringStatuses,
@@ -497,5 +499,65 @@ describe('paceProjection et adviceFor', () => {
   it('félicite quand le budget est maîtrisé', () => {
     const summary = summaryWith({ expenses: [expense({ amount: 200, type: 'fixe' })] })
     expect(adviceFor(summary, new Date(2026, 8, 15)).tone).toBe('positive')
+  })
+})
+
+describe('categoryDetailSummary et merchantDetailSummary', () => {
+  it('retourne un résumé vide sans dépense correspondante', () => {
+    const result = categoryDetailSummary([expense({ categoryId: 'cat-courses' })], 'cat-logement')
+    expect(result).toEqual({ plannedTotal: 0, paidTotal: 0, remainingToPay: 0, actualTotal: 0, count: 0 })
+  })
+
+  it('exclut les montants prévus null du total prévu', () => {
+    const rows = [
+      expense({ categoryId: 'cat-courses', plannedAmount: 100, amount: 90 }),
+      expense({ categoryId: 'cat-courses', plannedAmount: null, amount: 20 }),
+    ]
+    const result = categoryDetailSummary(rows, 'cat-courses')
+    expect(result.plannedTotal).toBe(100)
+  })
+
+  it('sépare le payé du restant à payer selon le statut', () => {
+    const rows = [
+      expense({ categoryId: 'cat-courses', amount: 50, status: 'paye' }),
+      expense({ categoryId: 'cat-courses', amount: 30, status: 'aPayer' }),
+    ]
+    const result = categoryDetailSummary(rows, 'cat-courses')
+    expect(result.paidTotal).toBe(50)
+    expect(result.remainingToPay).toBe(30)
+  })
+
+  it('actualTotal vaut toujours paidTotal + remainingToPay', () => {
+    const rows = [
+      expense({ categoryId: 'cat-courses', amount: 50, status: 'paye' }),
+      expense({ categoryId: 'cat-courses', amount: 30, status: 'aPayer' }),
+      expense({ categoryId: 'cat-courses', amount: 10, status: 'paye' }),
+    ]
+    const result = categoryDetailSummary(rows, 'cat-courses')
+    expect(result.actualTotal).toBe(result.paidTotal + result.remainingToPay)
+    expect(result.actualTotal).toBe(90)
+    expect(result.count).toBe(3)
+  })
+
+  it('filtre par catégorie indépendamment des autres', () => {
+    const rows = [
+      expense({ categoryId: 'cat-courses', amount: 50 }),
+      expense({ categoryId: 'cat-logement', amount: 800 }),
+    ]
+    expect(categoryDetailSummary(rows, 'cat-courses').count).toBe(1)
+    expect(categoryDetailSummary(rows, 'cat-courses').actualTotal).toBe(50)
+  })
+
+  it('filtre par enseigne indépendamment de la catégorie', () => {
+    const rows = [
+      expense({ categoryId: 'cat-courses', merchantId: 'm-lidl', amount: 40, status: 'paye' }),
+      expense({ categoryId: 'cat-logement', merchantId: 'm-lidl', amount: 15, status: 'aPayer' }),
+      expense({ categoryId: 'cat-courses', merchantId: 'm-auchan', amount: 60, status: 'paye' }),
+    ]
+    const result = merchantDetailSummary(rows, 'm-lidl')
+    expect(result.count).toBe(2)
+    expect(result.paidTotal).toBe(40)
+    expect(result.remainingToPay).toBe(15)
+    expect(result.actualTotal).toBe(55)
   })
 })

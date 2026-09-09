@@ -5,11 +5,12 @@ import { Card, EmptyState, SectionHeader, TagChip } from '@/components/Card'
 import { AmountText } from '@/components/AmountText'
 import { Button, IconButton } from '@/components/Button'
 import { MonthSwitcher } from '@/components/MonthSwitcher'
+import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/design-system/Icon'
 import { categoryColor } from '@/design-system/colors'
 import { useSwipe } from '@/hooks/useSwipe'
 import { expenseRepository } from '@/repositories'
-import { varianceOf } from '@/services/budgetEngine'
+import { categoryDetailSummary, merchantDetailSummary, varianceOf } from '@/services/budgetEngine'
 import { formatWeekday, monthName, plural, signedMoney } from '@/services/format'
 import {
   EXPENSE_TYPES,
@@ -36,17 +37,26 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<ExpenseType | null>(null)
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const [merchantFilter, setMerchantFilter] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState<'category' | 'merchant' | null>(null)
 
   const swipe = useSwipe((direction) => data.shiftPeriod(direction))
 
   const monthKey = `${data.year}-${String(data.month).padStart(2, '0')}`
 
+  const monthExpenses = useMemo(
+    () => data.expenses.filter((expense) => expense.monthKey === monthKey),
+    [data.expenses, monthKey],
+  )
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase('fr')
-    return data.expenses.filter((expense) => {
-      if (expense.monthKey !== monthKey) return false
+    return monthExpenses.filter((expense) => {
       if (typeFilter && expense.type !== typeFilter) return false
       if (statusFilter && expense.status !== statusFilter) return false
+      if (categoryFilter && expense.categoryId !== categoryFilter) return false
+      if (merchantFilter && expense.merchantId !== merchantFilter) return false
       if (!needle) return true
       const haystack = [
         expense.description,
@@ -58,7 +68,21 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
         .toLocaleLowerCase('fr')
       return haystack.includes(needle)
     })
-  }, [data, monthKey, search, typeFilter, statusFilter])
+  }, [monthExpenses, data, search, typeFilter, statusFilter, categoryFilter, merchantFilter])
+
+  /**
+   * Résumé de la catégorie ou de l'enseigne filtrée, calculé sur les dépenses
+   * du mois qui lui appartiennent — indépendamment des autres filtres actifs,
+   * pour toujours répondre à « combien pour ce poste ce mois-ci ? ».
+   */
+  const categorySummary = useMemo(
+    () => (categoryFilter ? categoryDetailSummary(monthExpenses, categoryFilter) : null),
+    [monthExpenses, categoryFilter],
+  )
+  const merchantSummary = useMemo(
+    () => (merchantFilter ? merchantDetailSummary(monthExpenses, merchantFilter) : null),
+    [monthExpenses, merchantFilter],
+  )
 
   /** Regroupement par jour, du plus récent au plus ancien. */
   const groups = useMemo(() => {
@@ -72,7 +96,20 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
   }, [filtered])
 
   const total = filtered.reduce((sum, expense) => sum + expense.amount, 0)
-  const isFiltering = search.trim() !== '' || typeFilter !== null || statusFilter !== null
+  const isFiltering =
+    search.trim() !== '' ||
+    typeFilter !== null ||
+    statusFilter !== null ||
+    categoryFilter !== null ||
+    merchantFilter !== null
+
+  const clearFilters = () => {
+    setSearch('')
+    setTypeFilter(null)
+    setStatusFilter(null)
+    setCategoryFilter(null)
+    setMerchantFilter(null)
+  }
 
   const today = new Date()
   const isCurrentMonth = today.getFullYear() === data.year && today.getMonth() + 1 === data.month
@@ -122,15 +159,7 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
         </div>
 
         <div className="filters" role="group" aria-label="Filtres">
-          <FilterChip
-            label="Tout"
-            active={!isFiltering}
-            onClick={() => {
-              setTypeFilter(null)
-              setStatusFilter(null)
-              setSearch('')
-            }}
-          />
+          <FilterChip label="Tout" active={!isFiltering} onClick={clearFilters} />
           {PAYMENT_STATUSES.map((value) => (
             <FilterChip
               key={value}
@@ -147,10 +176,59 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
               onClick={() => setTypeFilter(typeFilter === value ? null : value)}
             />
           ))}
+          <FilterChip
+            label={categoryFilter ? (data.categoryName(categoryFilter) ?? 'Catégorie') : 'Catégorie…'}
+            active={categoryFilter !== null}
+            onClick={() => {
+              if (categoryFilter) setCategoryFilter(null)
+              else setPickerOpen('category')
+            }}
+          />
+          <FilterChip
+            label={merchantFilter ? (data.merchantName(merchantFilter) ?? 'Enseigne') : 'Enseigne…'}
+            active={merchantFilter !== null}
+            onClick={() => {
+              if (merchantFilter) setMerchantFilter(null)
+              else setPickerOpen('merchant')
+            }}
+          />
         </div>
       </header>
 
       <div className="stack">
+        {categorySummary ? (
+          <Card>
+            <SectionHeader
+              title={data.categoryName(categoryFilter!) ?? 'Catégorie'}
+              subtitle="Résumé du mois pour cette catégorie"
+            />
+            <div className="entity-summary">
+              <EntitySummaryStat label="Prévu total" amount={categorySummary.plannedTotal} />
+              <EntitySummaryStat label="Déjà payé" amount={categorySummary.paidTotal} tone="positive" />
+              <EntitySummaryStat label="Reste à payer" amount={categorySummary.remainingToPay} tone="warning" />
+              <EntitySummaryStat label="Dépensé réel" amount={categorySummary.actualTotal} strong />
+              <EntitySummaryStat label={plural(categorySummary.count, 'dépense')} value={String(categorySummary.count)} />
+            </div>
+          </Card>
+        ) : null}
+
+        {merchantSummary ? (
+          <Card>
+            <SectionHeader
+              title={data.merchantName(merchantFilter!) ?? 'Enseigne'}
+              subtitle="Résumé du mois pour cette enseigne"
+            />
+            <div className="entity-summary">
+              <EntitySummaryStat label="Dépensé ce mois" amount={merchantSummary.actualTotal} strong />
+              <EntitySummaryStat label="Nombre d’achats" value={String(merchantSummary.count)} />
+              <EntitySummaryStat
+                label="Montant moyen"
+                amount={merchantSummary.count > 0 ? merchantSummary.actualTotal / merchantSummary.count : 0}
+              />
+            </div>
+          </Card>
+        ) : null}
+
         {filtered.length > 0 ? (
           <>
             <Card>
@@ -204,14 +282,7 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
               }
               action={
                 isFiltering ? (
-                  <Button
-                    variant="soft"
-                    onClick={() => {
-                      setSearch('')
-                      setTypeFilter(null)
-                      setStatusFilter(null)
-                    }}
-                  >
+                  <Button variant="soft" onClick={clearFilters}>
                     Effacer les filtres
                   </Button>
                 ) : (
@@ -224,6 +295,88 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
           </Card>
         )}
       </div>
+
+      <Sheet
+        open={pickerOpen === 'category'}
+        title="Filtrer par catégorie"
+        onClose={() => setPickerOpen(null)}
+      >
+        <ul className="picker-list">
+          {data.categories.map((category) => (
+            <li key={category.id}>
+              <button
+                type="button"
+                className="picker-list__row"
+                onClick={() => {
+                  haptic('light')
+                  setCategoryFilter(category.id)
+                  setPickerOpen(null)
+                }}
+              >
+                <Icon name={category.icon} size={17} />
+                <span>{category.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Sheet>
+
+      <Sheet
+        open={pickerOpen === 'merchant'}
+        title="Filtrer par enseigne"
+        onClose={() => setPickerOpen(null)}
+      >
+        {data.merchants.length > 0 ? (
+          <ul className="picker-list">
+            {data.merchants.map((merchant) => (
+              <li key={merchant.id}>
+                <button
+                  type="button"
+                  className="picker-list__row"
+                  onClick={() => {
+                    haptic('light')
+                    setMerchantFilter(merchant.id)
+                    setPickerOpen(null)
+                  }}
+                >
+                  <span>{merchant.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            icon={<Icon name="store" size={26} />}
+            title="Aucune enseigne"
+            message="Ajoutez une enseigne depuis une dépense pour pouvoir filtrer par enseigne."
+          />
+        )}
+      </Sheet>
+    </div>
+  )
+}
+
+function EntitySummaryStat({
+  label,
+  amount,
+  value,
+  tone = 'default',
+  strong = false,
+}: {
+  label: string
+  amount?: number
+  value?: string
+  tone?: 'default' | 'positive' | 'warning'
+  strong?: boolean
+}) {
+  return (
+    <div className={`entity-summary__stat ${strong ? 'entity-summary__stat--strong' : ''}`}>
+      <span className="entity-summary__label">{label}</span>
+      {amount !== undefined ? (
+        <AmountText amount={amount} privacyKey="expenseAmounts" size={strong ? 'tile' : 'row'} tone={tone} />
+      ) : (
+        <span className="entity-summary__value tnum">{value}</span>
+      )}
     </div>
   )
 }

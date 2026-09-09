@@ -191,3 +191,58 @@
     padding-bottom: 8px;
   }
 }
+
+/* Résumé catégorie/enseigne */
+.entity-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 10px;
+  padding-top: 6px;
+}
+
+.entity-summary__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.entity-summary__stat--strong {
+  grid-column: 1 / -1;
+}
+
+.entity-summary__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.entity-summary__value {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Feuille de sélection catégorie/enseigne */
+.picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.picker-list__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 4px;
+  border: none;
+  background: none;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 15px;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.picker-list__row:last-child {
+  border-bottom: none;
+}
