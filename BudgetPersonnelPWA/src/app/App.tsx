@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DataProvider, useData } from './DataContext'
 import { LockProvider, useLock } from './LockContext'
+import { UnlockSessionProvider } from './UnlockSession'
 import { ToastProvider } from './ToastContext'
 import { TabBar, type TabId } from './TabBar'
 import { UpdatePrompt } from './UpdatePrompt'
@@ -30,7 +31,9 @@ function AppWithLock() {
   const data = useData()
   return (
     <LockProvider settings={data.settings}>
-      <Shell />
+      <UnlockSessionProvider settings={data.settings}>
+        <Shell />
+      </UnlockSessionProvider>
     </LockProvider>
   )
 }

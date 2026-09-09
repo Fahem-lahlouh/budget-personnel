@@ -27,6 +27,87 @@ export type ThemePreference = 'system' | 'light' | 'dark'
 export const EXPENSE_TYPES: ExpenseType[] = ['fixe', 'variable', 'exceptionnelle']
 export const PAYMENT_STATUSES: PaymentStatus[] = ['paye', 'aPayer']
 
+// MARK: - Confidentialité granulaire
+//
+// Chaque montant affiché appartient à l'une de ces catégories. Les Réglages
+// décident, catégorie par catégorie, si elle doit rester masquée tant qu'elle
+// n'a pas été déverrouillée explicitement — indépendamment du verrouillage
+// global de l'app à l'ouverture.
+
+export type PrivacyKey =
+  | 'salary'
+  | 'remaining'
+  | 'realSavings'
+  | 'totalSpent'
+  | 'budgetGoal'
+  | 'expenseAmounts'
+  | 'confidentialExpenses'
+  | 'percentages'
+
+export const PRIVACY_KEYS: PrivacyKey[] = [
+  'salary',
+  'remaining',
+  'realSavings',
+  'totalSpent',
+  'budgetGoal',
+  'expenseAmounts',
+  'confidentialExpenses',
+  'percentages',
+]
+
+export const PRIVACY_KEY_LABELS: Record<PrivacyKey, string> = {
+  salary: 'Salaire',
+  remaining: 'Reste disponible',
+  realSavings: 'Épargne réelle',
+  totalSpent: 'Total dépensé',
+  budgetGoal: 'Budget / objectif',
+  expenseAmounts: 'Montants des dépenses',
+  confidentialExpenses: 'Montants des dépenses confidentielles',
+  percentages: 'Pourcentages',
+}
+
+/** Ce qui est protégé par défaut sur une installation neuve. */
+export const DEFAULT_PROTECTED_FIELDS: Record<PrivacyKey, boolean> = {
+  salary: true,
+  remaining: true,
+  realSavings: true,
+  totalSpent: true,
+  budgetGoal: true,
+  expenseAmounts: true,
+  confidentialExpenses: true,
+  percentages: false,
+}
+
+/**
+ * Durée pendant laquelle un champ révélé reste visible.
+ *
+ * `once` se referme de lui-même après une brève fenêtre de consultation ;
+ * `background` (par défaut) referme tout dès que l'app quitte le premier
+ * plan ; les autres valeurs sont de vraies minuteries qui survivent à un
+ * court passage en arrière-plan (consulter un message, par exemple).
+ */
+export type UnlockDuration = 'once' | '30s' | '1m' | '5m' | 'background'
+
+export const UNLOCK_DURATIONS: UnlockDuration[] = ['once', '30s', '1m', '5m', 'background']
+
+export const UNLOCK_DURATION_LABELS: Record<UnlockDuration, string> = {
+  once: 'Une seule consultation',
+  '30s': '30 secondes',
+  '1m': '1 minute',
+  '5m': '5 minutes',
+  background: 'Jusqu’à ce que l’app passe en arrière-plan',
+}
+
+/** Durée en millisecondes des minuteries. `once` est traité à part (8 s). */
+export const UNLOCK_DURATION_MS: Record<'once' | '30s' | '1m' | '5m', number> = {
+  once: 8_000,
+  '30s': 30_000,
+  '1m': 60_000,
+  '5m': 300_000,
+}
+
+export type PinLength = 4 | 6
+
 export interface Category {
   id: string
   name: string
@@ -96,11 +177,12 @@ export interface AppSettings {
   lockEnabled: boolean
   /** Déverrouillage biométrique via WebAuthn activé (nécessite `lockEnabled`). */
   biometricsEnabled: boolean
-  /**
-   * Les dépenses marquées « Confidentiel » restent masquées après le
-   * déverrouillage global, jusqu'à une authentification dédiée.
-   */
-  secondLevelForConfidential: boolean
+  /** Longueur du code PIN. Changer la longueur exige d'en ressaisir un nouveau. */
+  pinLength: PinLength
+  /** Quelles catégories de montants restent masquées tant qu'on ne les révèle pas. */
+  protectedFields: Record<PrivacyKey, boolean>
+  /** Combien de temps un champ révélé reste visible avant de se remasquer. */
+  unlockDuration: UnlockDuration
   /** Le jeu de démonstration a déjà été installé (ne pas le réinjecter). */
   demoSeeded: boolean
 }

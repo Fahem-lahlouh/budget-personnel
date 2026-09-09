@@ -157,7 +157,7 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
               <SectionHeader
                 title={`${filtered.length} ${plural(filtered.length, 'dépense')}`}
                 subtitle={isFiltering ? 'Total filtré' : 'Total du mois'}
-                trailing={<AmountText amount={total} size="tile" />}
+                trailing={<AmountText amount={total} privacyKey="totalSpent" size="tile" />}
               />
             </Card>
 
@@ -167,6 +167,7 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
                   <span className="day-group__date">{formatWeekday(date)}</span>
                   <AmountText
                     amount={items.reduce((sum, item) => sum + item.amount, 0)}
+                    privacyKey="expenseAmounts"
                     size="caption"
                     tone="muted"
                   />
@@ -314,7 +315,11 @@ function ExpenseRow({
         </span>
 
         <span className="expense-row__amounts">
-          <AmountText amount={expense.amount} confidential={expense.confidential} size="row" />
+          <AmountText
+            amount={expense.amount}
+            privacyKey={expense.confidential ? 'confidentialExpenses' : 'expenseAmounts'}
+            size="row"
+          />
           {variance !== null ? (
             <span
               className="expense-row__variance tnum"

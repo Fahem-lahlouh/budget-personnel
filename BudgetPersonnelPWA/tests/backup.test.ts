@@ -11,6 +11,7 @@ import {
 import { buildCsv, csvFileName } from '@/services/csv'
 import { SEED_CATEGORIES } from '@/data/seed'
 import type { Category, Expense, Merchant } from '@/models/types'
+import { DEFAULT_PROTECTED_FIELDS } from '@/models/types'
 
 beforeEach(async () => {
   await Promise.all([
@@ -166,7 +167,9 @@ describe('restoreBackup', () => {
       theme: 'system',
       lockEnabled: false,
       biometricsEnabled: false,
-      secondLevelForConfidential: true,
+      pinLength: 6,
+      protectedFields: DEFAULT_PROTECTED_FIELDS,
+      unlockDuration: 'background',
       demoSeeded: true,
     })
 
@@ -187,7 +190,9 @@ describe('restoreBackup', () => {
           theme: 'dark',
           lockEnabled: true,
           biometricsEnabled: true,
-          secondLevelForConfidential: true,
+          pinLength: 6,
+          protectedFields: DEFAULT_PROTECTED_FIELDS,
+          unlockDuration: 'background',
           demoSeeded: true,
         },
       },

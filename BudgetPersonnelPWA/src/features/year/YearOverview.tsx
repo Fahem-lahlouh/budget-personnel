@@ -1,5 +1,6 @@
 import { Card, EmptyState, SectionHeader } from '@/components/Card'
 import { AmountText } from '@/components/AmountText'
+import { PercentText } from '@/components/PercentText'
 import { ProgressBar, RankRow } from '@/components/Progress'
 import { DonutChart } from '@/components/charts/DonutChart'
 import { MonthlyBars, SalaryVsSpending, StackedShare } from '@/components/charts/BarChart'
@@ -7,7 +8,7 @@ import type { MonthPoint } from '@/components/charts/BarChart'
 import { Icon } from '@/design-system/Icon'
 import { PAYMENT_COLORS, TYPE_COLORS, categoryColor } from '@/design-system/colors'
 import { topWithOthers, type YearSummary } from '@/services/budgetEngine'
-import { monthName, ratio } from '@/services/format'
+import { monthName } from '@/services/format'
 import { EXPENSE_TYPES, PAYMENT_STATUSES, STATUS_LABELS, TYPE_LABELS } from '@/models/types'
 import './Year.css'
 
@@ -41,7 +42,7 @@ export function YearOverview({ summary, points }: YearOverviewProps) {
             icon="euro"
             tone="accent"
             label="Revenus cumulés"
-            value={<AmountText amount={summary.salary} size="tile" tone="accent" />}
+            value={<AmountText amount={summary.salary} privacyKey="salary" size="tile" tone="accent" />}
             hint="12 mois cumulés"
           />
         </Card>
@@ -50,8 +51,8 @@ export function YearOverview({ summary, points }: YearOverviewProps) {
             icon="arrowDownRight"
             tone="negative"
             label="Dépenses annuelles"
-            value={<AmountText amount={summary.total} size="tile" tone="negative" />}
-            hint={summary.salary > 0 ? `${ratio(summary.consumption)} des revenus` : undefined}
+            value={<AmountText amount={summary.total} privacyKey="totalSpent" size="tile" tone="negative" />}
+            hint={summary.salary > 0 ? <>{<PercentText value={summary.consumption} />} des revenus</> : undefined}
           />
         </Card>
         <Card>
@@ -59,9 +60,11 @@ export function YearOverview({ summary, points }: YearOverviewProps) {
             icon="wallet"
             tone="positive"
             label="Épargne annuelle"
-            value={<AmountText amount={summary.realSavings} size="tile" tone="positive" />}
+            value={<AmountText amount={summary.realSavings} privacyKey="realSavings" size="tile" tone="positive" />}
             hint={
-              summary.salary > 0 ? `${ratio(summary.realSavings / summary.salary)} des revenus` : undefined
+              summary.salary > 0
+                ? <>{<PercentText value={summary.realSavings / summary.salary} />} des revenus</>
+                : undefined
             }
           />
         </Card>
@@ -70,7 +73,7 @@ export function YearOverview({ summary, points }: YearOverviewProps) {
             icon="calendar"
             tone="warning"
             label="Moyenne / mois"
-            value={<AmountText amount={summary.monthlyAverage} size="tile" />}
+            value={<AmountText amount={summary.monthlyAverage} privacyKey="totalSpent" size="tile" />}
             hint="Sur les mois renseignés"
           />
         </Card>
@@ -191,7 +194,7 @@ export function YearOverview({ summary, points }: YearOverviewProps) {
               ) : (
                 <span className="year-detail__empty">Aucune dépense</span>
               )}
-              <AmountText amount={month.total} size="caption" tone="muted" />
+              <AmountText amount={month.total} privacyKey="totalSpent" size="caption" tone="muted" />
             </li>
           ))}
         </ul>
@@ -211,7 +214,7 @@ function YearTile({
   tone: 'accent' | 'positive' | 'warning' | 'negative'
   label: string
   value: React.ReactNode
-  hint?: string
+  hint?: React.ReactNode
 }) {
   return (
     <div className="kpi">

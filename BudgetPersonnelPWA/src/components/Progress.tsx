@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AmountText } from './AmountText'
+import { PercentText } from './PercentText'
 import { ratio } from '@/services/format'
 import './Progress.css'
 
@@ -108,12 +109,12 @@ export function BudgetRing({ consumption, spent, caption, size = 206 }: BudgetRi
       </svg>
 
       <div className="ring__center">
-        <div className="ring__percent tnum" style={{ color: tone }}>
-          {ratio(consumption)}
+        <div className="ring__percent">
+          <PercentText value={consumption} style={{ color: tone }} />
         </div>
         {/* Abrégé : « 2 118 € » tient dans l'anneau, « 2 118,18 € » non.
             Le montant exact est juste en dessous, dans la tuile « Total dépensé ». */}
-        <AmountText amount={spent} size="hero" compact />
+        <AmountText amount={spent} privacyKey="totalSpent" size="hero" compact />
         <div className="ring__caption">{caption}</div>
       </div>
     </div>
@@ -127,10 +128,19 @@ interface RankRowProps {
   share: number
   color: string
   icon?: ReactNode
+  privacyKey?: 'expenseAmounts' | 'totalSpent'
 }
 
 /** Ligne de classement : pastille, libellé, montant, barre de progression. */
-export function RankRow({ rank, name, amount, share, color, icon }: RankRowProps) {
+export function RankRow({
+  rank,
+  name,
+  amount,
+  share,
+  color,
+  icon,
+  privacyKey = 'expenseAmounts',
+}: RankRowProps) {
   return (
     <div className="rank-row">
       <div className="rank-row__top">
@@ -143,8 +153,8 @@ export function RankRow({ rank, name, amount, share, color, icon }: RankRowProps
         </span>
         <span className="rank-row__name">{name}</span>
         <span className="rank-row__values">
-          <AmountText amount={amount} size="row" />
-          <span className="rank-row__share tnum">{ratio(share)}</span>
+          <AmountText amount={amount} privacyKey={privacyKey} size="row" />
+          <PercentText value={share} className="rank-row__share" />
         </span>
       </div>
       <ProgressBar value={share} tone={color} />

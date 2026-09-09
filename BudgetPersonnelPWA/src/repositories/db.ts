@@ -9,7 +9,13 @@ import type {
   RecurringExpense,
   WebAuthnRecord,
 } from '@/models/types'
-import { SCHEMA_VERSION } from '@/models/types'
+import { DEFAULT_PROTECTED_FIELDS, SCHEMA_VERSION } from '@/models/types'
+import type {
+  CategorizationRule,
+  ImportSession,
+  ImportedTransaction,
+  MerchantAlias,
+} from '@/models/import'
 
 /**
  * Base IndexedDB de l'application.
@@ -33,6 +39,11 @@ export class BudgetDatabase extends Dexie {
   monthBudgets!: EntityTable<MonthBudget, 'id'>
   settings!: EntityTable<AppSettings, 'id'>
   credentials!: EntityTable<PinRecord | WebAuthnRecord, 'id'>
+  // Import depuis image (OCR local) : historique, règles apprises.
+  importSessions!: EntityTable<ImportSession, 'id'>
+  importedTransactions!: EntityTable<ImportedTransaction, 'id'>
+  merchantAliases!: EntityTable<MerchantAlias, 'id'>
+  categorizationRules!: EntityTable<CategorizationRule, 'id'>
 
   constructor(name = 'budget-personnel') {
     super(name)
@@ -48,6 +59,16 @@ export class BudgetDatabase extends Dexie {
       settings: 'id',
       credentials: 'id',
     })
+
+    // v2 : import de transactions depuis une image (OCR local) et moteur de
+    // catégorisation apprenant. Tables neuves uniquement — Dexie rejoue la v1
+    // avant celle-ci, aucune dépense existante n'est touchée.
+    this.version(2).stores({
+      importSessions: 'id, createdAt',
+      importedTransactions: 'id, sessionId, fingerprint',
+      merchantAliases: 'id, &normalizedPattern, merchantId',
+      categorizationRules: 'id, &normalizedPattern, merchantId, categoryId',
+    })
   }
 }
 
@@ -61,8 +82,25 @@ export function defaultSettings(): AppSettings {
     theme: 'system',
     lockEnabled: false,
     biometricsEnabled: false,
-    secondLevelForConfidential: true,
+    pinLength: 6,
+    protectedFields: { ...DEFAULT_PROTECTED_FIELDS },
+    unlockDuration: 'background',
     demoSeeded: false,
+  }
+}
+
+/**
+ * Complète un enregistrement de réglages avec les valeurs par défaut des
+ * champs ajoutés depuis. Un enregistrement écrit par une version antérieure
+ * de l'app n'a pas ces clés : sans ce filet, `settings.protectedFields`
+ * vaudrait `undefined` et ferait planter l'écran de confidentialité.
+ */
+export function normalizeSettings(stored: AppSettings): AppSettings {
+  const fallback = defaultSettings()
+  return {
+    ...fallback,
+    ...stored,
+    protectedFields: { ...fallback.protectedFields, ...stored.protectedFields },
   }
 }
 

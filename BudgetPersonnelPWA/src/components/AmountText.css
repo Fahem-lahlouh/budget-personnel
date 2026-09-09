@@ -33,3 +33,15 @@
 .amount--negative { color: var(--negative); }
 .amount--accent { color: var(--accent); }
 .amount--muted { color: var(--text-tertiary); }
+
+.amount--tappable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.amount--tappable:active {
+  opacity: 0.6;
+}

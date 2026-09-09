@@ -34,7 +34,7 @@ export function RecurringSheet({ open, onClose }: { open: boolean; onClose: () =
             <SectionHeader
               title="Total mensuel prévu"
               subtitle={`${active.length} active${active.length > 1 ? 's' : ''}`}
-              trailing={<AmountText amount={total} size="tile" />}
+              trailing={<AmountText amount={total} privacyKey="budgetGoal" size="tile" />}
             />
           </div>
 
@@ -70,7 +70,7 @@ export function RecurringSheet({ open, onClose }: { open: boolean; onClose: () =
                   </button>
                   <AmountText
                     amount={item.plannedAmount}
-                    confidential={item.confidential}
+                    privacyKey={item.confidential ? 'confidentialExpenses' : 'expenseAmounts'}
                     size="row"
                     tone={item.active ? 'default' : 'muted'}
                   />

@@ -80,7 +80,7 @@ export function DonutChart({ slices, total, centerLabel = 'Total' }: DonutChartP
           <span className="donut__center-label">{active?.name ?? centerLabel}</span>
           {/* Format abrégé : le total exact ne tient pas dans le disque
               central, et il est affiché en toutes lettres dans le tableau. */}
-          <AmountText amount={active?.amount ?? total} size="tile" compact />
+          <AmountText amount={active?.amount ?? total} privacyKey="totalSpent" size="tile" compact />
           {active ? <span className="donut__center-share tnum">{ratio(active.share)}</span> : null}
         </div>
       </div>

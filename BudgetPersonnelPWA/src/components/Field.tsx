@@ -193,3 +193,39 @@ export function Switch({ label, description, checked, onChange, disabled }: Swit
     </div>
   )
 }
+
+interface RadioListProps<T extends string> {
+  value: T
+  options: { value: T; label: string; description?: string }[]
+  onChange: (value: T) => void
+}
+
+/** Liste de choix exclusifs, un par ligne — pour un nombre d'options que le
+    sélecteur segmenté ne peut pas accueillir lisiblement. */
+export function RadioList<T extends string>({ value, options, onChange }: RadioListProps<T>) {
+  return (
+    <div className="radio-list" role="radiogroup">
+      {options.map((option) => {
+        const selected = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            className="radio-list__row"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option.value)}
+          >
+            <span className={`radio-list__bullet ${selected ? 'is-selected' : ''}`} aria-hidden="true" />
+            <span className="radio-list__text">
+              <span className="radio-list__label">{option.label}</span>
+              {option.description ? (
+                <span className="radio-list__desc">{option.description}</span>
+              ) : null}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}

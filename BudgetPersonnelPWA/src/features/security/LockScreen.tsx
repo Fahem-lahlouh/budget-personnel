@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLock } from '@/app/LockContext'
+import { useData } from '@/app/DataContext'
 import { Icon } from '@/design-system/Icon'
 import { haptic } from '@/utils/haptics'
 import { PinDots, PinPad } from './PinPad'
@@ -13,6 +14,8 @@ import './LockScreen.css'
  */
 export function LockScreen() {
   const lock = useLock()
+  const { settings } = useData()
+  const pinLength = settings?.pinLength ?? 6
   const [entry, setEntry] = useState('')
   const [error, setError] = useState(false)
   const [remaining, setRemaining] = useState(0)
@@ -50,16 +53,16 @@ export function LockScreen() {
     (digit: string) => {
       if (lock.isLockedOut) return
       setEntry((current) => {
-        if (current.length >= 6) return current
+        if (current.length >= pinLength) return current
         const next = current + digit
-        if (next.length === 6) {
-          // Laisse le 6ᵉ point s'afficher avant de valider.
+        if (next.length === pinLength) {
+          // Laisse le dernier point s'afficher avant de valider.
           window.setTimeout(() => void submit(next), 120)
         }
         return next
       })
     },
-    [lock.isLockedOut, submit],
+    [lock.isLockedOut, pinLength, submit],
   )
 
   // Saisie au clavier physique, pour l'usage sur ordinateur.
@@ -94,11 +97,11 @@ export function LockScreen() {
               ? `Trop de tentatives. Réessayez dans ${remaining} s.`
               : error
                 ? 'Code incorrect.'
-                : 'Saisissez votre code à 6 chiffres'}
+                : `Saisissez votre code à ${pinLength} chiffres`}
           </p>
         </div>
 
-        <PinDots filled={entry.length} error={error} />
+        <PinDots filled={entry.length} total={pinLength} error={error} />
 
         <PinPad
           disabled={lock.isLockedOut}
