@@ -60,7 +60,7 @@ export function RecurringReminder({ statuses, onQuickAdd }: RecurringReminderPro
         <SectionHeader
           title="À payer ce mois-ci"
           subtitle={`${statuses.length} ${plural(statuses.length, 'récurrente')} en attente`}
-          trailing={<AmountText amount={total} size="row" tone="warning" />}
+          trailing={<AmountText amount={total} privacyKey="expenseAmounts" size="row" tone="warning" />}
         />
 
         <ul className="reminder__list">
@@ -85,7 +85,7 @@ export function RecurringReminder({ statuses, onQuickAdd }: RecurringReminderPro
               <AmountText
                 amount={status.matched?.amount ?? status.recurring.plannedAmount}
                 size="row"
-                confidential={status.recurring.confidential}
+                privacyKey={status.recurring.confidential ? 'confidentialExpenses' : 'expenseAmounts'}
                 tone="muted"
               />
 

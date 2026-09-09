@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useData } from '@/app/DataContext'
 import { useLock } from '@/app/LockContext'
 import { useToast } from '@/app/ToastContext'
+import { useSecurityGate } from '@/app/useSecurityGate'
 import { Card, SectionHeader } from '@/components/Card'
 import { Button } from '@/components/Button'
-import { Segmented, Switch } from '@/components/Field'
+import { RadioList, Segmented, Switch } from '@/components/Field'
 import { Icon } from '@/design-system/Icon'
 import { pinService } from '@/services/crypto'
 import { isPlatformAuthenticatorAvailable, webauthnService } from '@/services/webauthn'
@@ -20,11 +21,19 @@ import { downloadBlob, readJsonFile } from '@/utils/download'
 import { resetToDemoData, wipeAllData } from '@/repositories'
 import { storageEstimate, requestPersistentStorage } from '@/repositories/db'
 import { bytes, plural } from '@/services/format'
-import type { ThemePreference } from '@/models/types'
+import {
+  UNLOCK_DURATIONS,
+  UNLOCK_DURATION_LABELS,
+  type PinLength,
+  type ThemePreference,
+  type UnlockDuration,
+} from '@/models/types'
 import { PinSetupSheet } from '@/features/security/PinSetupSheet'
 import { ListEditorSheet } from './ListEditorSheet'
 import { RecurringSheet } from '@/features/recurring/RecurringSheet'
 import { AboutSheet } from './AboutSheet'
+import { PrivacyFieldsSheet } from './PrivacyFieldsSheet'
+import { ImportHistorySheet } from '@/features/imports/ImportHistorySheet'
 import './Settings.css'
 
 type Dialog =
@@ -38,11 +47,16 @@ export function SettingsScreen() {
   const data = useData()
   const lock = useLock()
   const { notify } = useToast()
+  const requireConfirm = useSecurityGate()
 
   const [listSheet, setListSheet] = useState<'categories' | 'merchants' | null>(null)
   const [recurringOpen, setRecurringOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [pinSheet, setPinSheet] = useState<'create' | 'change' | null>(null)
+  const [importsOpen, setImportsOpen] = useState(false)
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [pinSheet, setPinSheet] = useState<{ mode: 'create' | 'change'; newLength: PinLength } | null>(
+    null,
+  )
   const [dialog, setDialog] = useState<Dialog>(null)
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null)
   const [persisted, setPersisted] = useState<boolean | null>(null)
@@ -58,21 +72,55 @@ export function SettingsScreen() {
   const settings = data.settings
   if (!settings) return null
 
-  // MARK: Confidentialité
+  // MARK: Sécurité — chaque changement sensible passe par `requireConfirm()`.
+  // Sans code déjà configuré, la garde s'efface d'elle-même (rien à protéger).
 
   const toggleLock = async (enabled: boolean) => {
     if (enabled) {
-      setPinSheet('create')
+      setPinSheet({ mode: 'create', newLength: settings.pinLength })
       return
     }
+    if (!(await requireConfirm())) return
     await pinService.clear()
     await webauthnService.clear()
     await data.updateSettings({ lockEnabled: false, biometricsEnabled: false })
+    lock.applySettings({ ...settings, lockEnabled: false })
     notify('Verrouillage désactivé')
+  }
+
+  const changePin = async () => {
+    if (!(await requireConfirm())) return
+    setPinSheet({ mode: 'change', newLength: settings.pinLength })
+  }
+
+  const changePinLength = async (length: PinLength) => {
+    if (length === settings.pinLength) return
+    if (!(await requireConfirm())) return
+    if (settings.lockEnabled) {
+      // Le code existant doit être ressaisi (à son ancienne longueur) avant
+      // d'en choisir un nouveau à la longueur choisie.
+      setPinSheet({ mode: 'change', newLength: length })
+    } else {
+      // Pas encore de code : rien à reconfirmer, la longueur s'applique
+      // simplement au prochain code créé.
+      await data.updateSettings({ pinLength: length })
+    }
+  }
+
+  const changeUnlockDuration = async (duration: UnlockDuration) => {
+    if (duration === settings.unlockDuration) return
+    if (!(await requireConfirm())) return
+    await data.updateSettings({ unlockDuration: duration })
+  }
+
+  const openPrivacyFields = async () => {
+    if (!(await requireConfirm())) return
+    setPrivacyOpen(true)
   }
 
   const toggleBiometrics = async (enabled: boolean) => {
     if (!enabled) {
+      if (!(await requireConfirm())) return
       await webauthnService.clear()
       await data.updateSettings({ biometricsEnabled: false })
       return
@@ -107,6 +155,7 @@ export function SettingsScreen() {
   }
 
   const pickBackup = async (file: File) => {
+    if (!(await requireConfirm())) return
     try {
       const parsed = await readJsonFile(file)
       const result = validateBackup(parsed)
@@ -139,6 +188,16 @@ export function SettingsScreen() {
     )
   }
 
+  const askWipe = async () => {
+    if (!(await requireConfirm())) return
+    setDialog({ kind: 'wipe' })
+  }
+
+  const askReseed = async () => {
+    if (!(await requireConfirm())) return
+    setDialog({ kind: 'reseed' })
+  }
+
   return (
     <div className="screen">
       <header className="screen__header">
@@ -146,27 +205,23 @@ export function SettingsScreen() {
       </header>
 
       <div className="stack">
-        {/* Confidentialité */}
+        {/* Sécurité */}
         <Card>
           <div className="stack">
-            <SectionHeader title="Confidentialité" />
+            <SectionHeader title="Sécurité" />
 
             <Switch
               label="Verrouiller l’app par code"
-              description="Code à 6 chiffres demandé à l’ouverture."
+              description={`Code à ${settings.pinLength} chiffres demandé à l’ouverture.`}
               checked={settings.lockEnabled}
               onChange={(value) => void toggleLock(value)}
             />
 
             {settings.lockEnabled ? (
               <>
-                <button
-                  type="button"
-                  className="settings__row"
-                  onClick={() => setPinSheet('change')}
-                >
+                <button type="button" className="settings__row" onClick={() => void changePin()}>
                   <Icon name="key" size={18} />
-                  <span>Modifier le code PIN</span>
+                  <span>Modifier le code</span>
                   <Icon name="chevronRight" size={16} />
                 </button>
 
@@ -184,20 +239,57 @@ export function SettingsScreen() {
               </>
             ) : null}
 
-            <Switch
-              label="Second niveau pour les dépenses confidentielles"
-              description="Les dépenses marquées « Confidentiel » restent masquées après le déverrouillage global."
-              checked={settings.secondLevelForConfidential}
-              onChange={(value) => {
-                void data.updateSettings({ secondLevelForConfidential: value })
-                lock.applySettings({ ...settings, secondLevelForConfidential: value })
-              }}
-            />
+            <div className="field">
+              <span className="field__label">Longueur du code</span>
+              <Segmented<'4' | '6'>
+                value={String(settings.pinLength) as '4' | '6'}
+                onChange={(value) => void changePinLength(Number(value) as PinLength)}
+                options={[
+                  { value: '4', label: '4 chiffres' },
+                  { value: '6', label: '6 chiffres' },
+                ]}
+              />
+            </div>
 
             <p className="settings__note">
               Le code est enregistré haché (PBKDF2-SHA256, sel aléatoire), jamais en clair. Il
               protège l’affichage des montants ; il ne chiffre pas la base — voir « À propos ».
             </p>
+          </div>
+        </Card>
+
+        {/* Confidentialité */}
+        <Card flush>
+          <div className="settings__group-title">
+            <SectionHeader
+              title="Confidentialité"
+              subtitle="Choisissez ce qui reste masqué tant que vous ne le révélez pas"
+            />
+          </div>
+          <ul className="list-rows">
+            <li>
+              <button type="button" className="settings__row" onClick={() => void openPrivacyFields()}>
+                <Icon name="eyeOff" size={18} />
+                <span>Champs protégés</span>
+                <span className="settings__value tnum">
+                  {Object.values(settings.protectedFields).filter(Boolean).length}
+                </span>
+                <Icon name="chevronRight" size={16} />
+              </button>
+            </li>
+          </ul>
+          <div className="settings__group-title" style={{ paddingTop: 4 }}>
+            <span className="field__label">Durée de révélation</span>
+          </div>
+          <div style={{ padding: '0 var(--pad-card) 14px' }}>
+            <RadioList<UnlockDuration>
+              value={settings.unlockDuration}
+              onChange={(value) => void changeUnlockDuration(value)}
+              options={UNLOCK_DURATIONS.map((value) => ({
+                value,
+                label: UNLOCK_DURATION_LABELS[value],
+              }))}
+            />
           </div>
         </Card>
 
@@ -230,6 +322,13 @@ export function SettingsScreen() {
                 <span className="settings__value tnum">
                   {data.recurring.filter((item) => item.active).length}
                 </span>
+                <Icon name="chevronRight" size={16} />
+              </button>
+            </li>
+            <li>
+              <button type="button" className="settings__row" onClick={() => setImportsOpen(true)}>
+                <Icon name="download" size={18} />
+                <span>Imports depuis image</span>
                 <Icon name="chevronRight" size={16} />
               </button>
             </li>
@@ -325,10 +424,10 @@ export function SettingsScreen() {
         <Card>
           <div className="stack">
             <SectionHeader title="Mes données" />
-            <Button variant="ghost" block icon={<Icon name="sparkle" size={17} />} onClick={() => setDialog({ kind: 'reseed' })}>
+            <Button variant="ghost" block icon={<Icon name="sparkle" size={17} />} onClick={() => void askReseed()}>
               Réinitialiser les données de démonstration
             </Button>
-            <Button variant="danger" block icon={<Icon name="trash" size={17} />} onClick={() => setDialog({ kind: 'wipe' })}>
+            <Button variant="danger" block icon={<Icon name="trash" size={17} />} onClick={() => void askWipe()}>
               Tout effacer
             </Button>
             <p className="settings__note">
@@ -361,17 +460,22 @@ export function SettingsScreen() {
       />
       <RecurringSheet open={recurringOpen} onClose={() => setRecurringOpen(false)} />
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <PrivacyFieldsSheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
+      <ImportHistorySheet open={importsOpen} onClose={() => setImportsOpen(false)} />
       <PinSetupSheet
         open={pinSheet !== null}
-        mode={pinSheet ?? 'create'}
+        mode={pinSheet?.mode ?? 'create'}
+        currentLength={settings.pinLength}
+        newLength={pinSheet?.newLength ?? settings.pinLength}
         onClose={() => setPinSheet(null)}
         onDone={() => {
-          if (pinSheet === 'create') {
-            void data.updateSettings({ lockEnabled: true })
-            notify('Verrouillage activé', 'success')
-          } else {
-            notify('Code modifié', 'success')
-          }
+          const wasCreate = pinSheet?.mode === 'create'
+          const newLength = pinSheet?.newLength ?? settings.pinLength
+          void data.updateSettings({
+            lockEnabled: true,
+            pinLength: newLength,
+          })
+          notify(wasCreate ? 'Verrouillage activé' : 'Code modifié', 'success')
         }}
       />
 

@@ -13,19 +13,19 @@ import { isPlatformAuthenticatorAvailable, webauthnService } from '@/services/we
 import type { AppSettings } from '@/models/types'
 
 /**
- * État de confidentialité de l'application.
+ * Verrouillage global de l'application : l'écran plein écran demandé au
+ * lancement et après une absence prolongée, quand « Verrouiller l'app par
+ * code » est activé dans les Réglages.
  *
- * Deux niveaux indépendants, comme dans la version iOS :
- * 1. **Verrouillage global** — tant qu'il est actif, aucun montant n'est
- *    lisible et l'écran de code recouvre l'app.
- * 2. **Dépenses confidentielles** — les lignes marquées « Confidentiel »
- *    restent masquées après le déverrouillage global, jusqu'à une
- *    authentification dédiée valable le temps de la session.
+ * Le masquage **par champ** (salaire, montants des dépenses…) est une
+ * question différente, traitée par `UnlockSession` — on peut très bien ne
+ * jamais activer ce verrouillage global et protéger uniquement le salaire.
+ * Tant que `locked` est vrai ici, en revanche, absolument rien n'est lisible :
+ * c'est le verrou de dernier recours.
  */
 
 interface LockState {
   locked: boolean
-  confidentialRevealed: boolean
   failedAttempts: number
   /** Horodatage de fin de temporisation, `0` s'il n'y en a pas. */
   lockedOutUntil: number
@@ -36,12 +36,9 @@ interface LockState {
 interface LockContextValue extends LockState {
   lockEnabled: boolean
   biometricsEnabled: boolean
-  secondLevelForConfidential: boolean
   isLockedOut: boolean
   submitPin: (pin: string) => Promise<boolean>
   unlockWithBiometrics: () => Promise<boolean>
-  revealConfidential: () => Promise<boolean>
-  hideConfidential: () => void
   lockNow: () => void
   applySettings: (settings: AppSettings) => void
 }
@@ -60,7 +57,6 @@ export function LockProvider({
 }) {
   const [state, setState] = useState<LockState>({
     locked: false,
-    confidentialRevealed: false,
     failedAttempts: 0,
     lockedOutUntil: 0,
     biometricsAvailable: false,
@@ -69,7 +65,6 @@ export function LockProvider({
 
   const lockEnabled = Boolean(settings?.lockEnabled)
   const biometricsEnabled = Boolean(settings?.biometricsEnabled)
-  const secondLevel = settings?.secondLevelForConfidential ?? true
   const hiddenSince = useRef<number>(0)
 
   // Amorçage : l'app démarre verrouillée si un code est configuré.
@@ -85,7 +80,6 @@ export function LockProvider({
       setState((prev) => ({
         ...prev,
         locked: settings.lockEnabled && configured,
-        confidentialRevealed: !settings.secondLevelForConfidential,
         biometricsAvailable: available,
         ready: true,
       }))
@@ -104,20 +98,12 @@ export function LockProvider({
    * cours d'utilisation. Le verrouillage prend effet au passage en arrière-plan.
    */
   const applySettings = useCallback((next: AppSettings) => {
-    setState((prev) => ({
-      ...prev,
-      confidentialRevealed: !next.secondLevelForConfidential,
-      locked: next.lockEnabled ? prev.locked : false,
-    }))
+    setState((prev) => ({ ...prev, locked: next.lockEnabled ? prev.locked : false }))
   }, [])
 
   const lockNow = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      locked: lockEnabled ? true : prev.locked,
-      confidentialRevealed: !secondLevel,
-    }))
-  }, [lockEnabled, secondLevel])
+    setState((prev) => ({ ...prev, locked: lockEnabled ? true : prev.locked }))
+  }, [lockEnabled])
 
   // Re-verrouillage quand l'app repasse en arrière-plan.
   //
@@ -125,25 +111,22 @@ export function LockProvider({
   // déclenche pas au passage en multitâche. Un délai de grâce évite de
   // redemander le code parce que le clavier a masqué la page une seconde.
   useEffect(() => {
-    if (!lockEnabled && !secondLevel) return
+    if (!lockEnabled) return
 
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         hiddenSince.current = Date.now()
-        // Le second niveau se referme immédiatement : c'est peu coûteux à
-        // rouvrir et c'est le plus sensible.
-        setState((prev) => ({ ...prev, confidentialRevealed: !secondLevel }))
         return
       }
       const away = Date.now() - hiddenSince.current
-      if (lockEnabled && hiddenSince.current > 0 && away > AUTO_LOCK_DELAY_MS) {
+      if (hiddenSince.current > 0 && away > AUTO_LOCK_DELAY_MS) {
         setState((prev) => ({ ...prev, locked: true }))
       }
     }
 
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [lockEnabled, secondLevel])
+  }, [lockEnabled])
 
   const isLockedOut = state.lockedOutUntil > Date.now()
 
@@ -152,13 +135,7 @@ export function LockProvider({
       if (state.lockedOutUntil > Date.now()) return false
 
       if (await pinService.verify(pin)) {
-        setState((prev) => ({
-          ...prev,
-          locked: false,
-          failedAttempts: 0,
-          lockedOutUntil: 0,
-          confidentialRevealed: !secondLevel,
-        }))
+        setState((prev) => ({ ...prev, locked: false, failedAttempts: 0, lockedOutUntil: 0 }))
         return true
       }
 
@@ -175,71 +152,30 @@ export function LockProvider({
       })
       return false
     },
-    [secondLevel, state.lockedOutUntil],
+    [state.lockedOutUntil],
   )
 
   const unlockWithBiometrics = useCallback(async (): Promise<boolean> => {
     if (!biometricsEnabled || state.lockedOutUntil > Date.now()) return false
     const success = await webauthnService.authenticate()
     if (success) {
-      setState((prev) => ({
-        ...prev,
-        locked: false,
-        failedAttempts: 0,
-        lockedOutUntil: 0,
-        confidentialRevealed: !secondLevel,
-      }))
+      setState((prev) => ({ ...prev, locked: false, failedAttempts: 0, lockedOutUntil: 0 }))
     }
     return success
-  }, [biometricsEnabled, secondLevel, state.lockedOutUntil])
-
-  const revealConfidential = useCallback(async (): Promise<boolean> => {
-    if (!secondLevel) {
-      setState((prev) => ({ ...prev, confidentialRevealed: true }))
-      return true
-    }
-    // Si la biométrie est enrôlée on la demande ; sinon le réglage seul fait
-    // office de garde-fou — exiger une preuve d'identité qu'on ne sait pas
-    // vérifier enfermerait l'utilisateur dehors sans rien protéger de plus.
-    if (biometricsEnabled && (await webauthnService.isEnrolled())) {
-      const success = await webauthnService.authenticate()
-      if (!success) return false
-    }
-    setState((prev) => ({ ...prev, confidentialRevealed: true }))
-    return true
-  }, [biometricsEnabled, secondLevel])
-
-  const hideConfidential = useCallback(() => {
-    setState((prev) => ({ ...prev, confidentialRevealed: false }))
-  }, [])
+  }, [biometricsEnabled, state.lockedOutUntil])
 
   const value = useMemo<LockContextValue>(
     () => ({
       ...state,
       lockEnabled,
       biometricsEnabled,
-      secondLevelForConfidential: secondLevel,
       isLockedOut,
       submitPin,
       unlockWithBiometrics,
-      revealConfidential,
-      hideConfidential,
       lockNow,
       applySettings,
     }),
-    [
-      state,
-      lockEnabled,
-      biometricsEnabled,
-      secondLevel,
-      isLockedOut,
-      submitPin,
-      unlockWithBiometrics,
-      revealConfidential,
-      hideConfidential,
-      lockNow,
-      applySettings,
-    ],
+    [state, lockEnabled, biometricsEnabled, isLockedOut, submitPin, unlockWithBiometrics, lockNow, applySettings],
   )
 
   return <LockContext.Provider value={value}>{children}</LockContext.Provider>

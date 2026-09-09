@@ -283,3 +283,39 @@
   justify-content: flex-end;
   margin-top: 16px;
 }
+
+.import-history__row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 0;
+}
+
+.import-history__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.import-history__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.import-history__title {
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.import-history__meta {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}

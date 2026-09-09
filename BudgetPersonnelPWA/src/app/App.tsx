@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DataProvider, useData } from './DataContext'
 import { LockProvider, useLock } from './LockContext'
+import { UnlockSessionProvider } from './UnlockSession'
 import { ToastProvider } from './ToastContext'
 import { TabBar, type TabId } from './TabBar'
 import { UpdatePrompt } from './UpdatePrompt'
@@ -10,6 +11,8 @@ import { ExpenseEditor, type EditorMode } from '@/features/expenses/ExpenseEdito
 import { AnalyticsScreen } from '@/features/analytics/AnalyticsScreen'
 import { SettingsScreen } from '@/features/settings/SettingsScreen'
 import { LockScreen } from '@/features/security/LockScreen'
+import { AddOptionsSheet } from '@/features/imports/AddOptionsSheet'
+import { ImportFlow } from '@/features/imports/ImportFlow'
 import { Sheet } from '@/components/Sheet'
 import { YearOverview } from '@/features/year/YearOverview'
 import { summarizeYear } from '@/services/budgetEngine'
@@ -30,7 +33,9 @@ function AppWithLock() {
   const data = useData()
   return (
     <LockProvider settings={data.settings}>
-      <Shell />
+      <UnlockSessionProvider settings={data.settings}>
+        <Shell />
+      </UnlockSessionProvider>
     </LockProvider>
   )
 }
@@ -42,6 +47,8 @@ function Shell() {
   const [tab, setTab] = useState<TabId>('dashboard')
   const [editor, setEditor] = useState<EditorMode | null>(null)
   const [yearOpen, setYearOpen] = useState(false)
+  const [addOptionsOpen, setAddOptionsOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   // Applique le thème choisi à la racine du document.
   useEffect(() => {
@@ -88,13 +95,28 @@ function Shell() {
       {tab === 'analytics' ? <AnalyticsScreen /> : null}
       {tab === 'settings' ? <SettingsScreen /> : null}
 
-      <TabBar active={tab} onSelect={setTab} onAdd={() => setEditor({ kind: 'create' })} />
+      <TabBar active={tab} onSelect={setTab} onAdd={() => setAddOptionsOpen(true)} />
 
       <ExpenseEditor
         open={editor !== null}
         mode={editor ?? { kind: 'create' }}
         onClose={() => setEditor(null)}
       />
+
+      <AddOptionsSheet
+        open={addOptionsOpen}
+        onClose={() => setAddOptionsOpen(false)}
+        onManual={() => {
+          setAddOptionsOpen(false)
+          setEditor({ kind: 'create' })
+        }}
+        onImport={() => {
+          setAddOptionsOpen(false)
+          setImportOpen(true)
+        }}
+      />
+
+      <ImportFlow open={importOpen} onClose={() => setImportOpen(false)} />
 
       <Sheet open={yearOpen} tall title={`Année ${data.year}`} onClose={() => setYearOpen(false)}>
         <div style={{ paddingTop: 12 }}>

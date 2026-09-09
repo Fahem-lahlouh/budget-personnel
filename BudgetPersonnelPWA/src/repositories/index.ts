@@ -1,4 +1,4 @@
-import { db, defaultSettings } from './db'
+import { db, defaultSettings, normalizeSettings } from './db'
 import type {
   AppSettings,
   Category,
@@ -15,6 +15,12 @@ import {
   buildDemoBudget,
   buildDemoExpenses,
 } from '@/data/seed'
+import type {
+  CategorizationRule,
+  ImportSession,
+  ImportedTransaction,
+  MerchantAlias,
+} from '@/models/import'
 
 /**
  * Accès aux données. Les composants ne parlent jamais à Dexie directement :
@@ -241,17 +247,137 @@ export const monthBudgetRepository = {
 export const settingsRepository = {
   async get(): Promise<AppSettings> {
     const existing = await db.settings.get('settings')
-    if (existing) return existing
-    const created = defaultSettings()
-    await db.settings.put(created)
-    return created
+    if (!existing) {
+      const created = defaultSettings()
+      await db.settings.put(created)
+      return created
+    }
+    // Complète les champs ajoutés depuis l'écriture de cet enregistrement,
+    // pour un navigateur qui a déjà une base créée par une version antérieure.
+    return normalizeSettings(existing)
   },
 
   async update(patch: Partial<Omit<AppSettings, 'id'>>): Promise<AppSettings> {
     const current = await settingsRepository.get()
-    const next = { ...current, ...patch }
+    const next: AppSettings = {
+      ...current,
+      ...patch,
+      protectedFields: { ...current.protectedFields, ...patch.protectedFields },
+    }
     await db.settings.put(next)
     return next
+  },
+}
+
+// MARK: - Import depuis image (OCR local)
+
+export const importSessionRepository = {
+  async all(): Promise<ImportSession[]> {
+    const rows = await db.importSessions.toArray()
+    return rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  },
+
+  async create(input: Omit<ImportSession, 'id'>): Promise<ImportSession> {
+    const session: ImportSession = { ...input, id: newId('imp') }
+    await db.importSessions.add(session)
+    return session
+  },
+
+  async update(id: string, patch: Partial<Omit<ImportSession, 'id'>>): Promise<void> {
+    await db.importSessions.update(id, patch)
+  },
+
+  async remove(id: string): Promise<void> {
+    await db.transaction('rw', [db.importSessions, db.importedTransactions], async () => {
+      await db.importSessions.delete(id)
+      await db.importedTransactions.where('sessionId').equals(id).delete()
+    })
+  },
+}
+
+export const importedTransactionRepository = {
+  async forSession(sessionId: string): Promise<ImportedTransaction[]> {
+    return db.importedTransactions.where('sessionId').equals(sessionId).toArray()
+  },
+
+  async bulkCreate(rows: ImportedTransaction[]): Promise<void> {
+    await db.importedTransactions.bulkAdd(rows)
+  },
+
+  async update(id: string, patch: Partial<Omit<ImportedTransaction, 'id'>>): Promise<void> {
+    await db.importedTransactions.update(id, patch)
+  },
+
+  /** Empreintes déjà connues, tous imports confondus, pour la détection de doublons. */
+  async allFingerprints(): Promise<Set<string>> {
+    const rows = await db.importedTransactions
+      .filter((row) => row.status === 'validee')
+      .toArray()
+    return new Set(rows.map((row) => row.fingerprint))
+  },
+}
+
+export const merchantAliasRepository = {
+  async all(): Promise<MerchantAlias[]> {
+    return db.merchantAliases.toArray()
+  },
+
+  /** Remplace tout alias existant pour ce motif : la dernière correction gagne. */
+  async learn(normalizedPattern: string, merchantId: string): Promise<void> {
+    const existing = await db.merchantAliases
+      .where('normalizedPattern')
+      .equals(normalizedPattern)
+      .first()
+    if (existing) {
+      await db.merchantAliases.update(existing.id, { merchantId })
+      return
+    }
+    await db.merchantAliases.add({
+      id: newId('alias'),
+      normalizedPattern,
+      merchantId,
+      createdAt: new Date().toISOString(),
+    })
+  },
+
+  async find(normalizedPattern: string): Promise<MerchantAlias | undefined> {
+    return db.merchantAliases.where('normalizedPattern').equals(normalizedPattern).first()
+  },
+}
+
+export const categorizationRuleRepository = {
+  async all(): Promise<CategorizationRule[]> {
+    return db.categorizationRules.toArray()
+  },
+
+  /** Remplace la règle existante pour ce motif : le dernier choix gagne. */
+  async learn(
+    normalizedPattern: string,
+    categoryId: string,
+    merchantId: string | null,
+  ): Promise<void> {
+    const now = new Date().toISOString()
+    const existing = await db.categorizationRules
+      .where('normalizedPattern')
+      .equals(normalizedPattern)
+      .first()
+    if (existing) {
+      await db.categorizationRules.update(existing.id, { categoryId, merchantId, updatedAt: now })
+      return
+    }
+    await db.categorizationRules.add({
+      id: newId('rule'),
+      normalizedPattern,
+      merchantId,
+      categoryId,
+      expenseType: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+  },
+
+  async find(normalizedPattern: string): Promise<CategorizationRule | undefined> {
+    return db.categorizationRules.where('normalizedPattern').equals(normalizedPattern).first()
   },
 }
 
@@ -292,7 +418,17 @@ export async function bootstrap(reference: Date = new Date()): Promise<AppSettin
 export async function wipeAllData(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.expenses, db.recurring, db.monthBudgets, db.categories, db.merchants],
+    [
+      db.expenses,
+      db.recurring,
+      db.monthBudgets,
+      db.categories,
+      db.merchants,
+      db.importSessions,
+      db.importedTransactions,
+      db.merchantAliases,
+      db.categorizationRules,
+    ],
     async () => {
       await Promise.all([
         db.expenses.clear(),
@@ -300,6 +436,10 @@ export async function wipeAllData(): Promise<void> {
         db.monthBudgets.clear(),
         db.categories.clear(),
         db.merchants.clear(),
+        db.importSessions.clear(),
+        db.importedTransactions.clear(),
+        db.merchantAliases.clear(),
+        db.categorizationRules.clear(),
       ])
     },
   )

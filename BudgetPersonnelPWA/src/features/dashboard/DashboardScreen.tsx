@@ -3,6 +3,8 @@ import { useData } from '@/app/DataContext'
 import { useLock } from '@/app/LockContext'
 import { Card, EmptyState, SectionHeader } from '@/components/Card'
 import { AmountText } from '@/components/AmountText'
+import { PercentText } from '@/components/PercentText'
+import { useUnlockSession } from '@/app/UnlockSession'
 import { Button, IconButton } from '@/components/Button'
 import { BudgetRing, ProgressBar, RankRow } from '@/components/Progress'
 import { MonthSwitcher } from '@/components/MonthSwitcher'
@@ -10,7 +12,8 @@ import { Icon } from '@/design-system/Icon'
 import { categoryColor } from '@/design-system/colors'
 import { useSwipe } from '@/hooks/useSwipe'
 import { adviceFor, recurringStatuses, summarizeMonth } from '@/services/budgetEngine'
-import { money, monthName, plural, ratio } from '@/services/format'
+import { money, monthName, plural } from '@/services/format'
+import { PRIVACY_KEYS } from '@/models/types'
 import { MonthBudgetSheet } from './MonthBudgetSheet'
 import { RecurringReminder } from './RecurringReminder'
 import './Dashboard.css'
@@ -29,6 +32,7 @@ export function DashboardScreen({
 }: DashboardScreenProps) {
   const data = useData()
   const lock = useLock()
+  const session = useUnlockSession()
   const [budgetSheetOpen, setBudgetSheetOpen] = useState(false)
 
   const swipe = useSwipe((direction) => data.shiftPeriod(direction))
@@ -60,6 +64,12 @@ export function DashboardScreen({
 
   const advice = useMemo(() => adviceFor(summary), [summary])
 
+  const protectedActiveKeys = PRIVACY_KEYS.filter((key) => data.settings?.protectedFields[key])
+  const anyMasked = lock.locked || session.isAnyMasked(protectedActiveKeys, data.settings)
+  const salaryMasked = lock.locked || !session.isVisible('salary', data.settings)
+  const sensitiveMasked =
+    lock.locked || session.isAnyMasked(['salary', 'remaining', 'totalSpent', 'realSavings'], data.settings)
+
   const today = new Date()
   const isCurrentMonth =
     today.getFullYear() === data.year && today.getMonth() + 1 === data.month
@@ -75,18 +85,14 @@ export function DashboardScreen({
               <Icon name="calendar" size={19} />
             </IconButton>
             <IconButton
-              label={
-                lock.confidentialRevealed
-                  ? 'Masquer les dépenses confidentielles'
-                  : 'Afficher les dépenses confidentielles'
-              }
+              label={anyMasked ? 'Afficher les montants protégés' : 'Masquer les montants protégés'}
               tone="neutral"
               onClick={() => {
-                if (lock.confidentialRevealed) lock.hideConfidential()
-                else void lock.revealConfidential()
+                if (anyMasked) void session.reveal(PRIVACY_KEYS, data.settings!)
+                else session.hide(PRIVACY_KEYS)
               }}
             >
-              <Icon name={lock.confidentialRevealed ? 'eye' : 'eyeOff'} size={19} />
+              <Icon name={anyMasked ? 'eyeOff' : 'eye'} size={19} />
             </IconButton>
           </div>
         </div>
@@ -108,7 +114,7 @@ export function DashboardScreen({
               spent={summary.total}
               caption={
                 summary.salary > 0
-                  ? `dépensés sur ${lock.locked ? '••••' : money(summary.salary)}`
+                  ? `dépensés sur ${salaryMasked ? '••••' : money(summary.salary)}`
                   : 'dépensés ce mois-ci'
               }
             />
@@ -116,13 +122,14 @@ export function DashboardScreen({
             <div className="dashboard__hero-stats">
               <div className="dashboard__stat">
                 <span className="dashboard__stat-label">Salaire</span>
-                <AmountText amount={summary.salary} size="row" tone="accent" />
+                <AmountText amount={summary.salary} privacyKey="salary" size="row" tone="accent" />
               </div>
               <div className="dashboard__stat-divider" aria-hidden="true" />
               <div className="dashboard__stat">
                 <span className="dashboard__stat-label">Reste disponible</span>
                 <AmountText
                   amount={summary.remaining}
+                  privacyKey="remaining"
                   size="row"
                   tone={summary.remaining < 0 ? 'negative' : 'positive'}
                 />
@@ -142,8 +149,8 @@ export function DashboardScreen({
               icon="arrowDownRight"
               tone="negative"
               label="Total dépensé"
-              value={<AmountText amount={summary.total} size="tile" tone="negative" />}
-              hint={summary.salary > 0 ? `${ratio(summary.consumption)} du salaire` : undefined}
+              value={<AmountText amount={summary.total} privacyKey="totalSpent" size="tile" tone="negative" />}
+              hint={summary.salary > 0 ? <>{<PercentText value={summary.consumption} />} du salaire</> : undefined}
             />
           </Card>
           <Card>
@@ -151,10 +158,10 @@ export function DashboardScreen({
               icon="wallet"
               tone="positive"
               label="Épargne réelle"
-              value={<AmountText amount={summary.realSavings} size="tile" tone="positive" />}
+              value={<AmountText amount={summary.realSavings} privacyKey="realSavings" size="tile" tone="positive" />}
               hint={
                 summary.salary > 0
-                  ? `${ratio(summary.realSavings / summary.salary)} du salaire`
+                  ? <>{<PercentText value={summary.realSavings / summary.salary} />} du salaire</>
                   : undefined
               }
             />
@@ -164,8 +171,8 @@ export function DashboardScreen({
               icon="target"
               tone="accent"
               label="Objectif"
-              value={<AmountText amount={summary.savingsGoal} size="tile" />}
-              hint={summary.savingsGoal > 0 ? `${ratio(summary.savingsProgress)} atteint` : 'Non défini'}
+              value={<AmountText amount={summary.savingsGoal} privacyKey="budgetGoal" size="tile" />}
+              hint={summary.savingsGoal > 0 ? <>{<PercentText value={summary.savingsProgress} />} atteint</> : 'Non défini'}
               footer={
                 summary.savingsGoal > 0 ? (
                   <ProgressBar
@@ -218,7 +225,7 @@ export function DashboardScreen({
             <div>
               <div className="advice__title">{advice.title}</div>
               <p className="advice__message">
-                {lock.locked ? 'Déverrouillez l’app pour voir le détail.' : advice.message}
+                {sensitiveMasked ? 'Déverrouillez ce montant pour voir le détail.' : advice.message}
               </p>
             </div>
           </div>
@@ -258,17 +265,19 @@ export function DashboardScreen({
                     : 'Toutes les récurrentes sont saisies'
                 }
               />
-              <ForecastRow label="Déjà dépensé" amount={summary.total} />
+              <ForecastRow label="Déjà dépensé" amount={summary.total} privacyKey="totalSpent" />
               <ForecastRow
                 label="Reste à venir (récurrentes)"
                 amount={summary.expectedRemaining}
+                privacyKey="totalSpent"
                 tone="warning"
               />
               <div className="dashboard__rule" />
-              <ForecastRow label="Total projeté" amount={summary.forecastTotal} strong />
+              <ForecastRow label="Total projeté" amount={summary.forecastTotal} privacyKey="totalSpent" strong />
               <ForecastRow
                 label="Reste estimé"
                 amount={summary.forecastRemaining}
+                privacyKey="remaining"
                 tone={summary.forecastRemaining < 0 ? 'negative' : 'positive'}
                 strong
               />
@@ -309,7 +318,7 @@ function KpiTile({
   tone: 'accent' | 'positive' | 'warning' | 'negative'
   label: string
   value: React.ReactNode
-  hint?: string
+  hint?: React.ReactNode
   footer?: React.ReactNode
 }) {
   return (
@@ -330,18 +339,20 @@ function KpiTile({
 function ForecastRow({
   label,
   amount,
+  privacyKey,
   tone = 'default',
   strong = false,
 }: {
   label: string
   amount: number
+  privacyKey?: 'totalSpent' | 'remaining'
   tone?: 'default' | 'positive' | 'warning' | 'negative'
   strong?: boolean
 }) {
   return (
     <div className={`forecast-row ${strong ? 'forecast-row--strong' : ''}`}>
       <span>{label}</span>
-      <AmountText amount={amount} size="row" tone={tone} />
+      <AmountText amount={amount} privacyKey={privacyKey} size="row" tone={tone} />
     </div>
   )
 }

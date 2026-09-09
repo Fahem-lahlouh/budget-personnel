@@ -205,3 +205,50 @@
 .switch:disabled {
   cursor: not-allowed;
 }
+
+.radio-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.radio-list__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  text-align: left;
+}
+
+.radio-list__row + .radio-list__row {
+  border-top: 1px solid var(--hairline);
+}
+
+.radio-list__bullet {
+  display: block;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--text-tertiary);
+  border-radius: 50%;
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.radio-list__bullet.is-selected {
+  border-width: 6px;
+  border-color: var(--accent);
+}
+
+.radio-list__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.radio-list__label {
+  font-size: 15px;
+}
+
+.radio-list__desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}

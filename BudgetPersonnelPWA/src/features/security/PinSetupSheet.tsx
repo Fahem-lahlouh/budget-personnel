@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Sheet } from '@/components/Sheet'
 import { pinService } from '@/services/crypto'
 import { haptic } from '@/utils/haptics'
+import type { PinLength } from '@/models/types'
 import { PinDots, PinPad } from './PinPad'
 import './LockScreen.css'
 
@@ -11,6 +12,10 @@ interface PinSetupSheetProps {
   open: boolean
   /** « change » demande l'ancien code avant d'en définir un nouveau. */
   mode: 'create' | 'change'
+  /** Longueur du code **actuel**, pour l'étape « current » en mode change. */
+  currentLength: PinLength
+  /** Longueur du **nouveau** code à définir (peut différer de l'actuel). */
+  newLength: PinLength
   onClose: () => void
   onDone: () => void
 }
@@ -20,8 +25,17 @@ interface PinSetupSheetProps {
  *
  * En mode « change », l'ancien code est exigé d'abord : sans cela, quelqu'un
  * qui trouve l'app déjà déverrouillée pourrait redéfinir le code à sa guise.
+ * Les deux longueurs sont indépendantes : passer de 6 à 4 chiffres demande
+ * l'ancien code à 6 chiffres, puis le nouveau à 4.
  */
-export function PinSetupSheet({ open, mode, onClose, onDone }: PinSetupSheetProps) {
+export function PinSetupSheet({
+  open,
+  mode,
+  currentLength,
+  newLength,
+  onClose,
+  onDone,
+}: PinSetupSheetProps) {
   const [step, setStep] = useState<Step>(mode === 'change' ? 'current' : 'new')
   const [entry, setEntry] = useState('')
   const [first, setFirst] = useState('')
@@ -81,16 +95,18 @@ export function PinSetupSheet({ open, mode, onClose, onDone }: PinSetupSheetProp
     [step, first, fail, onDone, onClose],
   )
 
+  const activeLength = step === 'current' ? currentLength : newLength
+
   const append = useCallback(
     (digit: string) => {
       setEntry((current) => {
-        if (current.length >= 6) return current
+        if (current.length >= activeLength) return current
         const next = current + digit
-        if (next.length === 6) window.setTimeout(() => void advance(next), 120)
+        if (next.length === activeLength) window.setTimeout(() => void advance(next), 120)
         return next
       })
     },
-    [advance],
+    [advance, activeLength],
   )
 
   const titles: Record<Step, string> = {
@@ -100,8 +116,8 @@ export function PinSetupSheet({ open, mode, onClose, onDone }: PinSetupSheetProp
   }
 
   const hints: Record<Step, string> = {
-    current: 'Saisissez votre code actuel pour continuer.',
-    new: 'Choisissez un code à 6 chiffres.',
+    current: `Saisissez votre code actuel à ${currentLength} chiffres.`,
+    new: `Choisissez un code à ${newLength} chiffres.`,
     confirm: 'Saisissez-le une seconde fois.',
   }
 
@@ -111,7 +127,7 @@ export function PinSetupSheet({ open, mode, onClose, onDone }: PinSetupSheetProp
         <p className={`lock-screen__hint ${error ? 'is-error' : ''}`}>
           {message ?? hints[step]}
         </p>
-        <PinDots filled={entry.length} error={error} />
+        <PinDots filled={entry.length} total={activeLength} error={error} />
         <PinPad onDigit={append} onDelete={() => setEntry((current) => current.slice(0, -1))} />
       </div>
     </Sheet>
