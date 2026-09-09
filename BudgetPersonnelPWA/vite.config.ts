@@ -4,11 +4,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
 // Le site est servi depuis un sous-chemin sur GitHub Pages
-// (https://<user>.github.io/fahem_c-/). Le `base` doit donc être identique en
+// (https://<user>.github.io/budget-personnel/). Le `base` doit donc être identique en
 // dev et en build : le scope du service worker et le `start_url` du manifest en
 // dépendent, et une incohérence casserait l'installation en écran d'accueil.
 // Surchargeable par VITE_BASE pour un domaine personnalisé ou un autre dépôt.
-const base = process.env.VITE_BASE ?? '/fahem_c-/'
+const base = process.env.VITE_BASE ?? '/budget-personnel/'
 
 export default defineConfig({
   base,
