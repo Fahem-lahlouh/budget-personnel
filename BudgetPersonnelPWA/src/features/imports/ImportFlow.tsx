@@ -15,7 +15,7 @@ import {
   merchantAliasRepository,
   categorizationRuleRepository,
 } from '@/repositories'
-import { preprocessImageForOcr } from '@/services/ocr/imagePreprocess'
+import { preprocessImageForOcr, ImageDecodeError } from '@/services/ocr/imagePreprocess'
 import { runOcr, OcrCancelledError, type OcrRunHandle } from '@/services/ocr/tesseractClient'
 import { parseStatementText } from '@/services/ocr/transactionParser'
 import { normalizeMerchantLabel } from '@/services/ocr/merchantNormalizer'
@@ -33,7 +33,7 @@ interface ImportFlowProps {
   onClose: () => void
 }
 
-type Step = 'pick' | 'processing' | 'review' | 'saving'
+type Step = 'pick' | 'processing' | 'review' | 'saving' | 'error'
 
 interface ReviewRow {
   tempId: string
@@ -58,8 +58,14 @@ function newTempId(): string {
   return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `row-${Math.random()}`
 }
 
+/**
+ * Seule une dépense est importable : l'app ne modélise pas les revenus (le
+ * salaire se règle dans les paramètres du mois). Valider un crédit ici le
+ * comptabiliserait comme un débit et fausserait tout le budget — on l'affiche
+ * donc, mais on refuse de l'enregistrer.
+ */
 function canValidateRow(row: ReviewRow): boolean {
-  return row.kind !== 'inconnu' && row.categoryId !== null && row.date !== null && !!row.amount && row.amount > 0
+  return row.kind === 'depense' && row.categoryId !== null && row.date !== null && !!row.amount && row.amount > 0
 }
 
 /**
@@ -78,6 +84,7 @@ export function ImportFlow({ open, onClose }: ImportFlowProps) {
   const [phase, setPhase] = useState<'preparing' | 'reading'>('preparing')
   const [rows, setRows] = useState<ReviewRow[]>([])
   const [sourceLabel, setSourceLabel] = useState('')
+  const [failure, setFailure] = useState<{ title: string; message: string } | null>(null)
   const ocrHandleRef = useRef<OcrRunHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -86,6 +93,13 @@ export function ImportFlow({ open, onClose }: ImportFlowProps) {
     setProgress(0)
     setPhase('preparing')
     setRows([])
+    setFailure(null)
+    ocrHandleRef.current = null
+  }, [])
+
+  const fail = useCallback((title: string, message: string) => {
+    setFailure({ title, message })
+    setStep('error')
     ocrHandleRef.current = null
   }, [])
 
@@ -111,8 +125,12 @@ export function ImportFlow({ open, onClose }: ImportFlowProps) {
 
       const parsed = parseStatementText(text, data.year)
       if (parsed.length === 0) {
-        notify('Aucune opération reconnue dans cette image.', 'error')
-        reset()
+        fail(
+          'Aucune opération reconnue',
+          text.trim().length === 0
+            ? 'Aucun texte n’a pu être lu sur cette image. Vérifiez qu’elle est nette, bien éclairée et prise droit, sans reflet.'
+            : 'Du texte a été lu, mais aucune ligne au format « date + libellé + montant » (ex. « 05/09 CARREFOUR -45,90 »). Cadrez la liste des opérations de votre relevé, dates comprises.',
+        )
         return
       }
 
@@ -163,8 +181,17 @@ export function ImportFlow({ open, onClose }: ImportFlowProps) {
         reset()
         return
       }
-      notify('Échec de la lecture de l’image. Réessayez avec une capture plus nette.', 'error')
-      reset()
+      if (error instanceof ImageDecodeError) {
+        fail(
+          'Image illisible',
+          'Ce fichier n’a pas pu être ouvert comme une image. Depuis un iPhone, choisissez la photo dans « Photothèque » plutôt que dans « Choisir un fichier », ou faites une capture d’écran du relevé.',
+        )
+        return
+      }
+      fail(
+        'La lecture a échoué',
+        `Le moteur de lecture s’est interrompu : ${error instanceof Error ? error.message : String(error)}`,
+      )
     }
   }
 
@@ -295,6 +322,21 @@ export function ImportFlow({ open, onClose }: ImportFlowProps) {
               if (file) void onFileChosen(file)
             }}
           />
+        </div>
+      ) : null}
+
+      {step === 'error' && failure ? (
+        <div className="import-flow__picker">
+          <span className="import-flow__picker-icon import-flow__picker-icon--warning">
+            <Icon name="alert" size={26} />
+          </span>
+          <div>
+            <p>{failure.title}</p>
+            <p className="import-flow__hint">{failure.message}</p>
+          </div>
+          <Button icon={<Icon name="upload" size={17} />} onClick={() => reset()}>
+            Choisir une autre image
+          </Button>
         </div>
       ) : null}
 
@@ -439,13 +481,17 @@ function ReviewRowCard({ row, onChange }: { row: ReviewRow; onChange: (patch: Pa
         <Button variant="soft" onClick={() => onChange({ editing: !row.editing })}>
           {row.editing ? 'Fermer' : 'Modifier'}
         </Button>
-        <Button
-          variant={row.decision === 'valider' ? 'danger' : 'primary'}
-          onClick={toggleDecision}
-          disabled={row.decision === 'ignorer' && !canValidateRow(row)}
-        >
-          {row.decision === 'valider' ? 'Ignorer' : 'Valider'}
-        </Button>
+        {/* Une ligne incomplète n'est pas un cul-de-sac : le bouton ouvre le
+            formulaire sur ce qui manque au lieu d'être grisé sans explication. */}
+        {row.decision === 'ignorer' && !canValidateRow(row) ? (
+          <Button variant="primary" onClick={() => onChange({ editing: true })}>
+            Compléter
+          </Button>
+        ) : (
+          <Button variant={row.decision === 'valider' ? 'danger' : 'primary'} onClick={toggleDecision}>
+            {row.decision === 'valider' ? 'Ignorer' : 'Valider'}
+          </Button>
+        )}
       </div>
 
       {row.editing ? (
@@ -453,19 +499,31 @@ function ReviewRowCard({ row, onChange }: { row: ReviewRow; onChange: (patch: Pa
           <AmountInput label="Montant" value={row.amount ?? 0} onChange={(value) => onChange({ amount: value })} />
           <DateField label="Date" value={row.date ?? ''} onChange={(value) => onChange({ date: value })} />
 
-          {row.kind === 'inconnu' ? (
-            <div className="field">
-              <span className="field__label">Type d’opération</span>
-              <div className="review-row__form-grid">
-                <Button variant="soft" onClick={() => onChange({ kind: 'depense' })}>
-                  Dépense
-                </Button>
-                <Button variant="soft" onClick={() => onChange({ kind: 'revenu' })}>
-                  Revenu
-                </Button>
-              </div>
+          {/* Toujours modifiable : l'OCR confond « - » et « — », ou perd le
+              signe d'un montant collé au libellé. */}
+          <div className="field">
+            <span className="field__label">Type d’opération</span>
+            <div className="review-row__form-grid">
+              <Button
+                variant={row.kind === 'depense' ? 'primary' : 'soft'}
+                onClick={() => onChange({ kind: 'depense' })}
+              >
+                Dépense
+              </Button>
+              <Button
+                variant={row.kind === 'revenu' ? 'primary' : 'soft'}
+                onClick={() => onChange({ kind: 'revenu' })}
+              >
+                Revenu
+              </Button>
             </div>
-          ) : null}
+            {row.kind === 'revenu' ? (
+              <p className="review-row__note">
+                Un revenu ne s’importe pas ici : renseignez votre salaire dans les réglages du
+                mois. Choisissez « Dépense » si l’opération en est une.
+              </p>
+            ) : null}
+          </div>
 
           <div className="field">
             <label className="field__label" htmlFor={`cat-${row.tempId}`}>

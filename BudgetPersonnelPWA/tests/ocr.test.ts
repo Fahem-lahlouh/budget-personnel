@@ -110,6 +110,35 @@ describe('parseStatementLine', () => {
     expect(result?.date).toBe('2026-09-20')
   })
 
+  // Un OCR restitue rarement l'espace fine des milliers : « 2 350,00 » revient
+  // le plus souvent « 2350,00 ». Ces montants doivent être lus tels quels, et
+  // non découpés en « 235 » puis « 0,00 », ce qui faisait disparaître la ligne.
+  it('lit un montant de quatre chiffres sans séparateur de milliers', () => {
+    const result = parseStatementLine('08/09  VIR SALAIRE SEPTEMBRE  +2350,00 EUR', 2026)
+    expect(result?.amount).toBe(2350)
+    expect(result?.kind).toBe('revenu')
+    expect(result?.label).toBe('VIR SALAIRE SEPTEMBRE')
+  })
+
+  it('lit un montant de cinq chiffres sans séparateur de milliers', () => {
+    expect(parseStatementLine('08/09  VIREMENT NOTAIRE  -12500,00', 2026)?.amount).toBe(12500)
+  })
+
+  it('lit indifféremment les deux écritures du même montant', () => {
+    const grouped = parseStatementLine('08/09  LOYER  -1 250,00', 2026)
+    const plain = parseStatementLine('08/09  LOYER  -1250,00', 2026)
+    expect(plain?.amount).toBe(grouped?.amount)
+    expect(plain?.amount).toBe(1250)
+  })
+
+  // Le montant reste le dernier nombre de la ligne : un code de magasin placé
+  // avant le libellé ne doit pas être pris pour lui.
+  it('ne confond pas un code de magasin avec le montant', () => {
+    const result = parseStatementLine('05/09  CB CARREFOUR 4021 PARIS  -45,90 €', 2026)
+    expect(result?.amount).toBe(45.9)
+    expect(result?.kind).toBe('depense')
+  })
+
   it('rejette une ligne sans date', () => {
     expect(parseStatementLine('Solde précédent : 1 200,00 €', 2026)).toBeNull()
   })
