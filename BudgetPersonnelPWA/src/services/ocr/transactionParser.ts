@@ -35,10 +35,13 @@ export function parseStatementLine(line: string, referenceYear: number): ParsedL
   // le montant de l'opération (le solde courant, s'il est imprimé, précède
   // rarement le montant sur la même ligne dans les relevés mobiles).
   const rest = trimmed.slice(dateMatch.index + dateMatch[0].length)
-  // Un groupe de milliers ne compte jamais que trois chiffres : contrairement à
-  // une classe de caractères non bornée, ce motif ne peut pas avaler un nombre
-  // isolé (ex. un code de magasin) et le signe qui suit réellement le montant.
-  const numberTokens = [...rest.matchAll(/[+-]?\s?\d{1,3}(?:[ \u00A0.]\d{3})*(?:,\d{2})?\s?€?-?/g)]
+  // La partie entière s'écrit soit groupée par milliers (« 2 350 »), soit d'un
+  // seul tenant (« 2350 ») : la forme groupée est tentée en premier car elle est la
+  // plus longue. Sans cette alternative, « 2350,00 » se découperait en « 235 »
+  // puis « 0,00 » et l'opération serait perdue. Les groupes restent bornés à trois
+  // chiffres pour ne pas avaler, à travers les espaces, un nombre isolé (code de
+  // magasin) et le signe qui suit réellement le montant.
+  const numberTokens = [...rest.matchAll(/[+-]?\s?(?:\d{1,3}(?:[ \u00A0.]\d{3})+|\d+)(?:,\d{2})?\s?€?-?/g)]
     .map((match) => match[0].trim())
     .filter((token) => /\d/.test(token))
   if (numberTokens.length === 0) return null
