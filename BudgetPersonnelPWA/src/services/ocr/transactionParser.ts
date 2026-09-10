@@ -1,4 +1,4 @@
-import { parseFrenchAmount, parseFrenchDate } from './amountParser'
+import { parseFrenchAmount, parseStatementDate } from './amountParser'
 import type { TransactionKind } from '@/models/import'
 
 export interface ParsedLine {
@@ -10,64 +10,133 @@ export interface ParsedLine {
   kind: TransactionKind
 }
 
-const DATE_TOKEN = /\d{2}\/\d{2}(?:\/\d{2,4})?/
+/**
+ * `jj/mm[/aa[aa]]` sur un relevé imprimé, `aaaa-mm-jj` dans les applications
+ * bancaires mobiles — ce sont elles que l'on photographie le plus souvent.
+ */
+const DATE_TOKEN = /\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}(?:\/\d{2,4})?/
 
 /**
- * Reconnaît, dans une ligne de relevé, la date (début de ligne le plus souvent)
- * et le dernier nombre au format monétaire (le montant termine généralement la
- * ligne ; les codes de magasin, eux, apparaissent avant le libellé). Le texte
- * entre les deux est le libellé de l'opération.
+ * Montant en fin de ligne. Les espaces sont tolérés à l'intérieur du nombre :
+ * l'OCR en insère (« -1 2,1 6 € » pour « -12,16 € ») et le séparateur de
+ * milliers français en est un — les retirer donne le bon nombre dans les deux
+ * cas. En contrepartie un nombre n'est retenu que s'il porte des décimales ou
+ * un symbole monétaire, sans quoi un numéro de carte ou une référence de
+ * mandat terminant la ligne passerait pour une somme.
+ */
+const TRAILING_AMOUNT = /([+-])?\s*(\d[\d \u00A0.]*)(,[\d ]{1,6})?\s*(€|EUR)?\s*(-)?\s*$/
+
+/** Lignes de synthèse qui portent un montant sans être des opérations. */
+const NON_TRANSACTION = /^(solde|total|report|nouveau solde|ancien solde)\b/i
+
+interface TrailingAmount {
+  index: number
+  value: number
+  sign: -1 | 0 | 1
+}
+
+function matchTrailingAmount(line: string): TrailingAmount | null {
+  const match = TRAILING_AMOUNT.exec(line)
+  if (!match) return null
+
+  const [full, , , decimals, currency] = match
+  if (!decimals && !currency) return null
+
+  // Une fois les espaces retirés, « -1 2,1 6 € » et « 1 234,56 € » retrouvent
+  // tous deux une écriture que le lecteur de montants standard sait relire.
+  const parsed = parseFrenchAmount(full.replace(/[ \u00A0]/g, '').replace(/EUR$/i, '€'))
+  if (!parsed || parsed.value === 0) return null
+
+  return { index: match.index, value: parsed.value, sign: parsed.sign }
+}
+
+function cleanLabel(raw: string, dateText: string | null): string {
+  const withoutDate = dateText ? raw.replace(dateText, ' ') : raw
+  return withoutDate
+    .replace(/[-–|*:]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Retourne la date d'une ligne voisine, une seule fois, puis la marque prise. */
+function claimDate(entry: ScannedLine, claimed: Set<number>, index: number): string | null {
+  if (!entry.date || claimed.has(index)) return null
+  claimed.add(index)
+  return entry.date
+}
+
+interface ScannedLine {
+  line: string
+  amount: TrailingAmount | null
+  dateText: string | null
+  date: string | null
+}
+
+/**
+ * Découpe un texte OCR en opérations.
+ *
+ * Chaque opération est ancrée sur la ligne qui porte son montant. Sa date n'y
+ * figure pas forcément : les applications bancaires la placent sur une ligne à
+ * part, sous l'opération (« Enregistré le 2026-09-04 »), là où un relevé
+ * imprimé la met en tête de ligne. On la cherche donc sur la ligne du montant,
+ * puis dans les lignes suivantes jusqu'à l'opération suivante, et seulement
+ * ensuite au-dessus — chaque recherche restant bornée par les opérations
+ * voisines pour qu'une ligne n'emprunte jamais la date d'une autre.
  *
  * Ne retourne jamais un montant dont le signe serait deviné : sans + ni -
  * explicite dans le texte, `kind` vaut `'inconnu'` — à l'utilisateur de
  * trancher en écran de validation, jamais à l'app de choisir à sa place.
  */
-export function parseStatementLine(line: string, referenceYear: number): ParsedLine | null {
-  const trimmed = line.trim()
-  if (trimmed.length < 6) return null
+export function parseStatementText(text: string, referenceYear: number): ParsedLine[] {
+  const scanned: ScannedLine[] = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const dateText = DATE_TOKEN.exec(line)?.[0] ?? null
+      return {
+        line,
+        amount: matchTrailingAmount(line),
+        dateText,
+        date: dateText ? parseStatementDate(dateText, referenceYear) : null,
+      }
+    })
 
-  const dateMatch = DATE_TOKEN.exec(trimmed)
-  if (!dateMatch) return null
-  const date = parseFrenchDate(dateMatch[0], referenceYear)
-  if (!date) return null
+  const anchors = scanned.flatMap((entry, index) => (entry.amount ? [index] : []))
+  const claimed = new Set<number>()
+  const results: ParsedLine[] = []
 
-  // Tous les nombres à la française présents après la date : le dernier est
-  // le montant de l'opération (le solde courant, s'il est imprimé, précède
-  // rarement le montant sur la même ligne dans les relevés mobiles).
-  const rest = trimmed.slice(dateMatch.index + dateMatch[0].length)
-  // La partie entière s'écrit soit groupée par milliers (« 2 350 »), soit d'un
-  // seul tenant (« 2350 ») : la forme groupée est tentée en premier car elle est la
-  // plus longue. Sans cette alternative, « 2350,00 » se découperait en « 235 »
-  // puis « 0,00 » et l'opération serait perdue. Les groupes restent bornés à trois
-  // chiffres pour ne pas avaler, à travers les espaces, un nombre isolé (code de
-  // magasin) et le signe qui suit réellement le montant.
-  const numberTokens = [...rest.matchAll(/[+-]?\s?(?:\d{1,3}(?:[ \u00A0.]\d{3})+|\d+)(?:,\d{2})?\s?€?-?/g)]
-    .map((match) => match[0].trim())
-    .filter((token) => /\d/.test(token))
-  if (numberTokens.length === 0) return null
+  for (const [rank, index] of anchors.entries()) {
+    const entry = scanned[index]
+    const amount = entry.amount!
+    const previous = rank > 0 ? anchors[rank - 1] : -1
+    const next = rank + 1 < anchors.length ? anchors[rank + 1] : scanned.length
 
-  const amountToken = numberTokens[numberTokens.length - 1]
-  const parsedAmount = parseFrenchAmount(amountToken.replace(/€/g, '').trim())
-  if (!parsedAmount || parsedAmount.value === 0) return null
+    // Une ligne de date ne sert qu'une fois : les opérations étant parcourues
+    // de haut en bas, celle qui la revendique la première est celle qu'elle
+    // accompagne. Sans quoi une opération dont la date manque emprunterait
+    // celle de sa voisine et serait datée à tort.
+    let date = entry.date
+    for (let j = index + 1; j < next && !date; j += 1) date = claimDate(scanned[j], claimed, j)
+    for (let j = index - 1; j > previous && !date; j -= 1) date = claimDate(scanned[j], claimed, j)
+    if (!date) continue
 
-  const amountIndex = rest.lastIndexOf(amountToken)
-  const label = rest
-    .slice(0, amountIndex)
-    .replace(/[-–|*]+$/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (!label) return null
+    const label = cleanLabel(entry.line.slice(0, amount.index), entry.dateText)
+    if (!label || NON_TRANSACTION.test(label)) continue
 
-  const kind: TransactionKind =
-    parsedAmount.sign < 0 ? 'depense' : parsedAmount.sign > 0 ? 'revenu' : 'inconnu'
+    results.push({
+      rawLine: entry.line,
+      date,
+      label,
+      amount: amount.value,
+      kind: amount.sign < 0 ? 'depense' : amount.sign > 0 ? 'revenu' : 'inconnu',
+    })
+  }
 
-  return { rawLine: trimmed, date, label, amount: parsedAmount.value, kind }
+  return results
 }
 
-/** Découpe un texte OCR brut en lignes candidates, en ignorant celles sans opération reconnaissable. */
-export function parseStatementText(text: string, referenceYear: number): ParsedLine[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => parseStatementLine(line, referenceYear))
-    .filter((line): line is ParsedLine => line !== null)
+/** Lit une opération tenant sur une seule ligne (relevé imprimé). */
+export function parseStatementLine(line: string, referenceYear: number): ParsedLine | null {
+  return parseStatementText(line, referenceYear)[0] ?? null
 }

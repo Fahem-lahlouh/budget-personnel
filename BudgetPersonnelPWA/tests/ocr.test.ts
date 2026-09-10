@@ -165,6 +165,80 @@ describe('parseStatementText', () => {
   })
 })
 
+// Format des applications bancaires mobiles, celui que l'on photographie le
+// plus souvent : date en ISO sur sa propre ligne, sous l'opération, et libellé
+// débordant sur une ligne de continuation.
+describe('parseStatementText — capture d’application bancaire', () => {
+  const capture = [
+    'Opérations Budget',
+    '',
+    'PRLV SEPA AVANSSUR ECH/040926 ID - 93,86 €',
+    'EMETTEUR/FR64777395200 MDT/1000449...',
+    '',
+    'Enregistré le 2026-09-04',
+    '',
+    'PRLV SEPA BOUYGUES TELECOM ECH/ -1 2,1 6 €',
+    '040926 ID EMETTEUR/FR35777418323 MD...',
+    '',
+    'Enregistré le 2026-09-04',
+    'CB en cours de traitement -7,00 €',
+    '',
+    'Enregistré le 2026-09-03',
+    'CB DU 030926 SOMEL LEVALLOIS PER - 3,49 €',
+    'CARTE 4974XXXXXXXX4234',
+    '',
+    'Enregistré le 2026-09-03',
+  ].join('\n')
+
+  it('rattache à chaque opération la date écrite sous elle', () => {
+    const result = parseStatementText(capture, 2026)
+    expect(result).toHaveLength(4)
+    expect(result.map((row) => row.date)).toEqual([
+      '2026-09-04',
+      '2026-09-04',
+      '2026-09-03',
+      '2026-09-03',
+    ])
+  })
+
+  it('recolle un montant que l’OCR a truffé d’espaces', () => {
+    // « - 12,16 € » ressort « -1 2,1 6 € » : retirer les espaces le restaure,
+    // exactement comme pour un séparateur de milliers.
+    expect(parseStatementText(capture, 2026)[1].amount).toBe(12.16)
+  })
+
+  it('ne prend pas un numéro de carte ou une référence de mandat pour un montant', () => {
+    const labels = parseStatementText(capture, 2026).map((row) => row.label)
+    expect(labels).not.toContain('CARTE')
+    expect(labels.some((label) => label.includes('EMETTEUR'))).toBe(false)
+    expect(labels[3]).toBe('CB DU 030926 SOMEL LEVALLOIS PER')
+  })
+
+  it('lit les montants et leur sens', () => {
+    expect(parseStatementText(capture, 2026).map((row) => [row.amount, row.kind])).toEqual([
+      [93.86, 'depense'],
+      [12.16, 'depense'],
+      [7, 'depense'],
+      [3.49, 'depense'],
+    ])
+  })
+
+  // Sans signe lisible, on ne devine pas : l'écran de validation demandera.
+  it('laisse le sens indéterminé quand l’OCR a perdu le signe', () => {
+    const text = 'CB DU 280826 NI - POULET LEVALLOIS PER 8,30 €\nEnregistré le 2026-09-01'
+    const [row] = parseStatementText(text, 2026)
+    expect(row.amount).toBe(8.3)
+    expect(row.kind).toBe('inconnu')
+  })
+
+  it('n’emprunte pas la date d’une opération voisine', () => {
+    const text = ['CB BOULANGERIE - 4,50 €', 'Enregistré le 2026-09-02', 'CB SANS DATE - 9,90 €'].join('\n')
+    const result = parseStatementText(text, 2026)
+    expect(result).toHaveLength(1)
+    expect(result[0].label).toBe('CB BOULANGERIE')
+  })
+})
+
 describe('computeFingerprint et détection de doublons', () => {
   it('produit la même empreinte pour des libellés bruts équivalents', () => {
     const a = computeFingerprint('2026-09-20', 25.9, 'AUCHAN SUPERMARCHE 057')
