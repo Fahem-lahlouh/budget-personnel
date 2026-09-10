@@ -4,6 +4,7 @@ import { bootstrap } from '@/repositories'
 import {
   BACKUP_FORMAT_VERSION,
   backupFileName,
+  backupFreshness,
   createBackup,
   restoreBackup,
   validateBackup,
@@ -171,6 +172,7 @@ describe('restoreBackup', () => {
       protectedFields: DEFAULT_PROTECTED_FIELDS,
       unlockDuration: 'background',
       keepReceiptImages: true,
+      lastBackupAt: null,
       demoSeeded: true,
     })
 
@@ -326,5 +328,44 @@ describe('noms de fichiers', () => {
     const date = new Date(2026, 8, 8)
     expect(backupFileName(date)).toBe('budget-personnel-sauvegarde-2026-09-08.json')
     expect(csvFileName(date)).toBe('budget-personnel-2026-09-08.csv')
+  })
+})
+
+// La sauvegarde est la seule protection contre la perte totale : la règle qui
+// décide s'il faut la réclamer mérite d'être vérifiée pour elle-même.
+describe('backupFreshness', () => {
+  const now = new Date('2026-09-10T12:00:00.000Z')
+
+  it('ne réclame rien tant qu’aucune dépense n’a été saisie', () => {
+    expect(backupFreshness(null, 0, now)).toEqual({ state: 'fresh', days: null })
+  })
+
+  it('signale l’absence totale de sauvegarde dès qu’il y a des données', () => {
+    expect(backupFreshness(null, 3, now)).toEqual({ state: 'never', days: null })
+  })
+
+  it('reste sereine juste avant le seuil', () => {
+    const recent = new Date('2026-08-13T12:00:00.000Z').toISOString() // 28 jours
+    expect(backupFreshness(recent, 3, now)).toEqual({ state: 'fresh', days: 28 })
+  })
+
+  it('alerte à partir du seuil', () => {
+    const old = new Date('2026-08-11T12:00:00.000Z').toISOString() // 30 jours
+    expect(backupFreshness(old, 3, now)).toEqual({ state: 'stale', days: 30 })
+  })
+
+  it('compte zéro jour pour une sauvegarde du jour', () => {
+    expect(backupFreshness(now.toISOString(), 3, now)).toEqual({ state: 'fresh', days: 0 })
+  })
+
+  // Une date illisible ne doit pas passer pour une sauvegarde valide : mieux
+  // vaut réclamer un export de trop qu'en laisser manquer un.
+  it('traite une date illisible comme une absence de sauvegarde', () => {
+    expect(backupFreshness('pas-une-date', 3, now)).toEqual({ state: 'never', days: null })
+  })
+
+  it('ne rend jamais un nombre de jours négatif', () => {
+    const future = new Date('2026-09-20T12:00:00.000Z').toISOString()
+    expect(backupFreshness(future, 3, now).days).toBe(0)
   })
 })

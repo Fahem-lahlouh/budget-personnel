@@ -45,6 +45,11 @@
   color: var(--text-primary);
 }
 
+.settings__stat--warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+
 .settings__divider {
   height: 1px;
   margin: 2px 0;

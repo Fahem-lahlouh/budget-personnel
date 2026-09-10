@@ -13,6 +13,7 @@ import { isPlatformAuthenticatorAvailable, webauthnService } from '@/services/we
 import { buildCsv, csvBlob, csvFileName } from '@/services/csv'
 import {
   backupFileName,
+  backupFreshness,
   createBackup,
   restoreBackup,
   validateBackup,
@@ -107,6 +108,7 @@ export function SettingsScreen() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null)
   const [photos, setPhotos] = useState<{ count: number; bytes: number } | null>(null)
+
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [biometricsAvailable, setBiometricsAvailable] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -122,6 +124,13 @@ export function SettingsScreen() {
 
   const settings = data.settings
   if (!settings) return null
+
+  const freshness = backupFreshness(settings.lastBackupAt, data.expenses.length)
+  const lastBackupLabel = settings.lastBackupAt
+    ? `${new Date(settings.lastBackupAt).toLocaleDateString('fr-FR')}${
+        freshness.days ? ` · il y a ${freshness.days} j` : ' · aujourd’hui'
+      }`
+    : 'Jamais'
 
   // MARK: Sécurité — chaque changement sensible passe par `requireConfirm()`.
   // Sans code déjà configuré, la garde s'efface d'elle-même (rien à protéger).
@@ -202,6 +211,9 @@ export function SettingsScreen() {
     const backup = await createBackup()
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     downloadBlob(blob, backupFileName())
+    // La date n'est retenue qu'ici : un export CSV est lisible mais partiel,
+    // il ne permettrait pas de remonter la base et ne met donc rien à l'abri.
+    await data.updateSettings({ lastBackupAt: backup.exportedAt })
     notify('Sauvegarde créée', 'success')
   }
 
@@ -219,6 +231,10 @@ export function SettingsScreen() {
         summary: result.summary,
         apply: async () => {
           await restoreBackup(result.backup)
+          // Les données en place sont désormais celles du fichier : la
+          // dernière mise à l'abri remonte donc à sa date d'export, pas à
+          // aujourd'hui.
+          await data.updateSettings({ lastBackupAt: result.summary.exportedAt || null })
           await data.refresh()
           notify('Sauvegarde restaurée', 'success')
         },
@@ -413,7 +429,16 @@ export function SettingsScreen() {
           <div className="stack">
             <SectionHeader title="Sauvegarde" subtitle="Vos données, sous votre contrôle" />
 
-            <p className="settings__note settings__note--strong">
+            <div className="settings__stat">
+              <span>Dernière sauvegarde</span>
+              <span className={freshness.state === 'fresh' ? '' : 'settings__stat--warning'}>
+                {lastBackupLabel}
+              </span>
+            </div>
+
+            <p
+              className={`settings__note ${freshness.state === 'fresh' ? '' : 'settings__note--strong'}`}
+            >
               Une PWA n’offre pas les mêmes garanties de conservation qu’une app installée :
               effacer les données de navigation, ou laisser l’app inutilisée plusieurs semaines,
               peut faire disparaître la base. Exportez une sauvegarde régulièrement.

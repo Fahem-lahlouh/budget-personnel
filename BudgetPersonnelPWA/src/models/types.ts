@@ -188,6 +188,14 @@ export interface AppSettings {
    * Coupé, l'OCR tourne toujours mais l'image est jetée une fois lue.
    */
   keepReceiptImages: boolean
+  /**
+   * Date du dernier export de sauvegarde, `null` s'il n'y en a jamais eu.
+   *
+   * C'est la seule protection contre la perte totale : une PWA peut être
+   * évincée par le navigateur sans prévenir. Retenir la date permet de le
+   * rappeler au bon moment plutôt que d'y compter en silence.
+   */
+  lastBackupAt: string | null
   /** Le jeu de démonstration a déjà été installé (ne pas le réinjecter). */
   demoSeeded: boolean
 }

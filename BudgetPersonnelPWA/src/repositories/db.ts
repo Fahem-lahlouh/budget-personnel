@@ -99,6 +99,7 @@ export function defaultSettings(): AppSettings {
     protectedFields: { ...DEFAULT_PROTECTED_FIELDS },
     unlockDuration: 'background',
     keepReceiptImages: true,
+    lastBackupAt: null,
     demoSeeded: false,
   }
 }

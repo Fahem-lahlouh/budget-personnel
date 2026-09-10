@@ -16,12 +16,14 @@ import { money, monthName, plural } from '@/services/format'
 import { PRIVACY_KEYS } from '@/models/types'
 import { MonthBudgetSheet } from './MonthBudgetSheet'
 import { RecurringReminder } from './RecurringReminder'
+import { BackupReminder } from './BackupReminder'
 import './Dashboard.css'
 
 interface DashboardScreenProps {
   onAddExpense: () => void
   onAddFromRecurring: (recurringId: string) => void
   onOpenYear: () => void
+  onOpenSettings: () => void
 }
 
 /** Tableau de bord mensuel — écran d'accueil. */
@@ -29,6 +31,7 @@ export function DashboardScreen({
   onAddExpense,
   onAddFromRecurring,
   onOpenYear,
+  onOpenSettings,
 }: DashboardScreenProps) {
   const data = useData()
   const lock = useLock()
@@ -106,6 +109,8 @@ export function DashboardScreen({
       </header>
 
       <div className="stack">
+        <BackupReminder onOpenSettings={onOpenSettings} />
+
         {/* Carte principale : anneau + salaire / reste */}
         <Card>
           <div className="dashboard__hero">

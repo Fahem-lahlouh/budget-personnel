@@ -91,6 +91,7 @@ function Shell() {
           onAddExpense={() => setEditor({ kind: 'create' })}
           onAddFromRecurring={(recurringId) => setEditor({ kind: 'createFromRecurring', recurringId })}
           onOpenYear={() => setYearOpen(true)}
+          onOpenSettings={() => setTab('settings')}
         />
       ) : null}
 

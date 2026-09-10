@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Button } from './Button'
 import { haptic } from '@/utils/haptics'
 import './ConfirmDialog.css'
@@ -44,14 +44,30 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  // Gardée dans une ref pour que l'abonnement ci-dessous ne dépende que de
+  // l'ouverture : `onCancel` est presque toujours une fonction anonyme, donc
+  // différente à chaque rendu du parent.
+  const onCancelRef = useRef(onCancel)
+  onCancelRef.current = onCancel
+
   useEffect(() => {
     if (!open) return
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel()
+      if (event.key === 'Escape') onCancelRef.current()
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onCancel])
+
+    // La touche Échap qui a demandé cette confirmation est encore en train de
+    // se propager quand la modale se monte : s'abonner immédiatement la ferait
+    // annuler par le geste même qui l'a ouverte. On attend la fin de
+    // l'événement en cours.
+    const timer = window.setTimeout(() => document.addEventListener('keydown', onKeyDown))
+
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   if (!open) return null
 
