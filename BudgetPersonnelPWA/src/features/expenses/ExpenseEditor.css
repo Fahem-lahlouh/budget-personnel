@@ -71,21 +71,3 @@
   }
 }
 
-.editor__confirm {
-  padding: 14px;
-  background: var(--negative-soft);
-  border-radius: var(--radius-inner);
-  text-align: center;
-}
-
-.editor__confirm p {
-  margin: 0 0 10px;
-  font-size: 14px;
-  font-weight: 550;
-}
-
-.editor__confirm-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}

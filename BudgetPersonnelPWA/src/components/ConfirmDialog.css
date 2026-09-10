@@ -1,0 +1,48 @@
+/*
+ * Confirmation modale, partagée par toutes les actions irréversibles.
+ * Vit ici et non dans les Réglages : la même question doit se poser à
+ * l'identique depuis la liste des dépenses comme depuis les récurrentes.
+ */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--overlay);
+  animation: sheet-fade var(--dur) var(--ease);
+}
+
+.confirm-box {
+  width: min(360px, 100%);
+  padding: 22px;
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow-raised);
+}
+
+.confirm-box h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.confirm-box p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.confirm-box__warning {
+  color: var(--negative);
+  font-weight: 550;
+}
+
+.confirm-box__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}

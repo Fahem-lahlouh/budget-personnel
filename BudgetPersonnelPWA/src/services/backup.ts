@@ -56,6 +56,34 @@ export interface BackupFile {
 
 export const BACKUP_FORMAT_VERSION = 1
 
+/** Au-delà, la sauvegarde est considérée trop ancienne pour rassurer. */
+export const BACKUP_STALE_DAYS = 30
+
+export type BackupFreshness = 'never' | 'stale' | 'fresh'
+
+/**
+ * Depuis combien de temps les données ne sont plus à l'abri.
+ *
+ * Sans dépense saisie, il n'y a rien à perdre : on ne réclame pas une
+ * sauvegarde d'une base vide. Passé ce cas, ne jamais avoir exporté et avoir
+ * exporté il y a deux mois exposent au même risque — le navigateur peut
+ * évincer la base d'un site resté inutilisé.
+ */
+export function backupFreshness(
+  lastBackupAt: string | null,
+  expenseCount: number,
+  now: Date = new Date(),
+): { state: BackupFreshness; days: number | null } {
+  if (expenseCount === 0) return { state: 'fresh', days: null }
+  if (!lastBackupAt) return { state: 'never', days: null }
+
+  const then = new Date(lastBackupAt).getTime()
+  if (Number.isNaN(then)) return { state: 'never', days: null }
+
+  const days = Math.floor((now.getTime() - then) / 86_400_000)
+  return { state: days >= BACKUP_STALE_DAYS ? 'stale' : 'fresh', days: Math.max(days, 0) }
+}
+
 export async function createBackup(): Promise<BackupFile> {
   const [expenses, categories, merchants, recurring, monthBudgets, settings, receipts] =
     await Promise.all([

@@ -6,12 +6,14 @@ import { useSecurityGate } from '@/app/useSecurityGate'
 import { Card, SectionHeader } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { RadioList, Segmented, Switch } from '@/components/Field'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Icon } from '@/design-system/Icon'
 import { pinService } from '@/services/crypto'
 import { isPlatformAuthenticatorAvailable, webauthnService } from '@/services/webauthn'
 import { buildCsv, csvBlob, csvFileName } from '@/services/csv'
 import {
   backupFileName,
+  backupFreshness,
   createBackup,
   restoreBackup,
   validateBackup,
@@ -37,6 +39,33 @@ import { PrivacyFieldsSheet } from './PrivacyFieldsSheet'
 import { ImportHistorySheet } from '@/features/imports/ImportHistorySheet'
 import './Settings.css'
 
+/** Ce que chaque confirmation annonce. Regroupé pour parler d'une seule voix. */
+const DIALOG_COPY: Record<
+  'wipe' | 'reseed' | 'deletePhotos' | 'import',
+  { title: string; confirmLabel: string; warning?: string }
+> = {
+  wipe: {
+    title: 'Tout effacer ?',
+    confirmLabel: 'Tout effacer',
+    warning: 'Cette action est irréversible.',
+  },
+  reseed: {
+    title: 'Recharger la démonstration ?',
+    confirmLabel: 'Recharger',
+    warning: 'Vos données actuelles seront remplacées.',
+  },
+  deletePhotos: {
+    title: 'Supprimer les photos ?',
+    confirmLabel: 'Supprimer',
+    warning: 'Cette action est irréversible.',
+  },
+  import: {
+    title: 'Restaurer cette sauvegarde ?',
+    confirmLabel: 'Restaurer',
+    warning: 'Vos données actuelles seront intégralement remplacées.',
+  },
+}
+
 type Dialog =
   | null
   | { kind: 'wipe' }
@@ -45,6 +74,23 @@ type Dialog =
   | { kind: 'import'; summary: BackupSummary; apply: () => Promise<void> }
 
 /** Écran des réglages. */
+function describeDialog(dialog: NonNullable<Dialog>): string {
+  if (dialog.kind === 'wipe') {
+    return 'Toutes vos dépenses, récurrentes et salaires seront supprimés. Exportez d’abord une sauvegarde si vous souhaitez les conserver.'
+  }
+  if (dialog.kind === 'reseed') {
+    return 'Vos données actuelles seront remplacées par le jeu d’exemple sur le mois en cours.'
+  }
+  if (dialog.kind === 'deletePhotos') {
+    const plural = dialog.count > 1
+    return `${dialog.count} photo${plural ? 's' : ''} de ticket. Les articles et montants déjà extraits sont conservés : seule l’image disparaît.`
+  }
+  const date = dialog.summary.exportedAt
+    ? new Date(dialog.summary.exportedAt).toLocaleDateString('fr-FR')
+    : 'date inconnue'
+  return `Fichier du ${date} : ${dialog.summary.expenses} dépenses, ${dialog.summary.categories} catégories, ${dialog.summary.merchants} enseignes, ${dialog.summary.recurring} récurrentes, ${dialog.summary.monthBudgets} budgets mensuels.`
+}
+
 export function SettingsScreen() {
   const data = useData()
   const lock = useLock()
@@ -62,6 +108,7 @@ export function SettingsScreen() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null)
   const [photos, setPhotos] = useState<{ count: number; bytes: number } | null>(null)
+
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [biometricsAvailable, setBiometricsAvailable] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -77,6 +124,13 @@ export function SettingsScreen() {
 
   const settings = data.settings
   if (!settings) return null
+
+  const freshness = backupFreshness(settings.lastBackupAt, data.expenses.length)
+  const lastBackupLabel = settings.lastBackupAt
+    ? `${new Date(settings.lastBackupAt).toLocaleDateString('fr-FR')}${
+        freshness.days ? ` · il y a ${freshness.days} j` : ' · aujourd’hui'
+      }`
+    : 'Jamais'
 
   // MARK: Sécurité — chaque changement sensible passe par `requireConfirm()`.
   // Sans code déjà configuré, la garde s'efface d'elle-même (rien à protéger).
@@ -157,6 +211,9 @@ export function SettingsScreen() {
     const backup = await createBackup()
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     downloadBlob(blob, backupFileName())
+    // La date n'est retenue qu'ici : un export CSV est lisible mais partiel,
+    // il ne permettrait pas de remonter la base et ne met donc rien à l'abri.
+    await data.updateSettings({ lastBackupAt: backup.exportedAt })
     notify('Sauvegarde créée', 'success')
   }
 
@@ -174,6 +231,10 @@ export function SettingsScreen() {
         summary: result.summary,
         apply: async () => {
           await restoreBackup(result.backup)
+          // Les données en place sont désormais celles du fichier : la
+          // dernière mise à l'abri remonte donc à sa date d'export, pas à
+          // aujourd'hui.
+          await data.updateSettings({ lastBackupAt: result.summary.exportedAt || null })
           await data.refresh()
           notify('Sauvegarde restaurée', 'success')
         },
@@ -368,7 +429,16 @@ export function SettingsScreen() {
           <div className="stack">
             <SectionHeader title="Sauvegarde" subtitle="Vos données, sous votre contrôle" />
 
-            <p className="settings__note settings__note--strong">
+            <div className="settings__stat">
+              <span>Dernière sauvegarde</span>
+              <span className={freshness.state === 'fresh' ? '' : 'settings__stat--warning'}>
+                {lastBackupLabel}
+              </span>
+            </div>
+
+            <p
+              className={`settings__note ${freshness.state === 'fresh' ? '' : 'settings__note--strong'}`}
+            >
               Une PWA n’offre pas les mêmes garanties de conservation qu’une app installée :
               effacer les données de navigation, ou laisser l’app inutilisée plusieurs semaines,
               peut faire disparaître la base. Exportez une sauvegarde régulièrement.
@@ -514,86 +584,38 @@ export function SettingsScreen() {
         }}
       />
 
-      {/* Confirmations */}
-      {dialog ? (
-        <div className="confirm-overlay" role="dialog" aria-modal="true">
-          <div className="confirm-box">
-            {dialog.kind === 'wipe' ? (
-              <>
-                <h2>Tout effacer ?</h2>
-                <p>
-                  Toutes vos dépenses, récurrentes et salaires seront supprimés définitivement.
-                  Exportez d’abord une sauvegarde si vous souhaitez les conserver.
-                </p>
-              </>
-            ) : dialog.kind === 'reseed' ? (
-              <>
-                <h2>Recharger la démonstration ?</h2>
-                <p>
-                  Vos données actuelles seront remplacées par le jeu d’exemple sur le mois en
-                  cours.
-                </p>
-              </>
-            ) : dialog.kind === 'deletePhotos' ? (
-              <>
-                <h2>Supprimer {dialog.count} photo{dialog.count > 1 ? 's' : ''} ?</h2>
-                <p>
-                  Les articles et les montants déjà extraits de ces tickets sont conservés : seule
-                  l’image disparaît.
-                </p>
-              </>
-            ) : (
-              <>
-                <h2>Restaurer cette sauvegarde ?</h2>
-                <p>
-                  Fichier du{' '}
-                  {dialog.summary.exportedAt
-                    ? new Date(dialog.summary.exportedAt).toLocaleDateString('fr-FR')
-                    : 'date inconnue'}{' '}
-                  : {dialog.summary.expenses} dépenses, {dialog.summary.categories} catégories,{' '}
-                  {dialog.summary.merchants} enseignes, {dialog.summary.recurring} récurrentes,{' '}
-                  {dialog.summary.monthBudgets} budgets mensuels.
-                </p>
-                <p className="confirm-box__warning">
-                  Vos données actuelles seront intégralement remplacées.
-                </p>
-              </>
-            )}
-
-            <div className="confirm-box__actions">
-              <Button variant="ghost" onClick={() => setDialog(null)}>
-                Annuler
-              </Button>
-              <Button
-                variant={dialog.kind === 'import' ? 'primary' : 'danger'}
-                onClick={() => {
-                  void (async () => {
-                    if (dialog.kind === 'wipe') {
-                      await wipeAllData()
-                      await data.refresh()
-                      notify('Données effacées')
-                    } else if (dialog.kind === 'reseed') {
-                      await resetToDemoData()
-                      await data.refresh()
-                      notify('Démonstration rechargée', 'success')
-                    } else if (dialog.kind === 'deletePhotos') {
-                      await receiptImageRepository.removeAll()
-                      setPhotos({ count: 0, bytes: 0 })
-                      await data.refresh()
-                      notify('Photos supprimées')
-                    } else {
-                      await dialog.apply()
-                    }
-                    setDialog(null)
-                  })()
-                }}
-              >
-                {dialog.kind === 'import' ? 'Restaurer' : 'Confirmer'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Confirmations — toutes passent par la même modale. */}
+      <ConfirmDialog
+        open={dialog !== null}
+        title={dialog ? DIALOG_COPY[dialog.kind].title : ''}
+        message={dialog ? describeDialog(dialog) : undefined}
+        warning={dialog ? DIALOG_COPY[dialog.kind].warning : undefined}
+        confirmLabel={dialog ? DIALOG_COPY[dialog.kind].confirmLabel : ''}
+        destructive={dialog?.kind !== 'import'}
+        onCancel={() => setDialog(null)}
+        onConfirm={() => {
+          if (!dialog) return
+          void (async () => {
+            if (dialog.kind === 'wipe') {
+              await wipeAllData()
+              await data.refresh()
+              notify('Données effacées')
+            } else if (dialog.kind === 'reseed') {
+              await resetToDemoData()
+              await data.refresh()
+              notify('Démonstration rechargée', 'success')
+            } else if (dialog.kind === 'deletePhotos') {
+              await receiptImageRepository.removeAll()
+              setPhotos({ count: 0, bytes: 0 })
+              await data.refresh()
+              notify('Photos supprimées')
+            } else {
+              await dialog.apply()
+            }
+            setDialog(null)
+          })()
+        }}
+      />
     </div>
   )
 }

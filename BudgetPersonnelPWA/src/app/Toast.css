@@ -13,6 +13,9 @@
 }
 
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   padding: 11px 18px;
   border-radius: var(--radius-pill);
   font-size: 14px;
@@ -21,6 +24,30 @@
   background: #17191f;
   box-shadow: var(--shadow-raised);
   animation: toast-in var(--dur) var(--ease);
+}
+
+/* Le conteneur laisse passer les touchers ; un bandeau porteur d'une action
+   doit au contraire les recevoir, sinon son bouton serait décoratif. */
+.toast:has(.toast__action) {
+  pointer-events: auto;
+}
+
+.toast__action {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  margin: -5px -8px -5px 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  /* Cible confortable au pouce, sans grossir le bandeau. */
+  min-height: 32px;
+}
+
+.toast__action:active {
+  background: rgb(255 255 255 / 0.28);
 }
 
 .toast--success { background: #0f7a54; }

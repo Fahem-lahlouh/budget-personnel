@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Sheet } from '@/components/Sheet'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { AmountInput, DateField, Segmented, Switch, TextField } from '@/components/Field'
 import { Button } from '@/components/Button'
 import { Icon } from '@/design-system/Icon'
@@ -40,6 +41,38 @@ interface ExpenseEditorProps {
  * reste (enseigne, date, type, statut, budget, remarque) est disponible juste
  * en dessous sans être imposé.
  */
+/** Les champs qui composent une dépense en cours de saisie. */
+interface FormValues {
+  amount: number
+  categoryId: string
+  merchantId: string
+  description: string
+  date: string
+  type: ExpenseType
+  status: PaymentStatus
+  plannedAmount: number | null
+  note: string
+  confidential: boolean
+  recurringId: string | null
+}
+
+/** Empreinte stable d'un formulaire, pour comparer deux états sans champ à champ. */
+function signatureOf(values: FormValues): string {
+  return JSON.stringify([
+    values.amount,
+    values.categoryId,
+    values.merchantId,
+    values.description,
+    values.date,
+    values.type,
+    values.status,
+    values.plannedAmount,
+    values.note,
+    values.confidential,
+    values.recurringId,
+  ])
+}
+
 export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
   const data = useData()
   const { notify } = useToast()
@@ -57,27 +90,54 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
   const [recurringId, setRecurringId] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmAbandon, setConfirmAbandon] = useState(false)
 
   const isEditing = mode.kind === 'edit'
+
+  /**
+   * Empreinte du formulaire à l'ouverture, pour savoir plus tard si quelque
+   * chose a été touché. Elle est posée par l'effet d'initialisation à partir
+   * des valeurs qu'il applique — et non lue dans l'état, qui n'est pas encore
+   * à jour à ce moment-là.
+   */
+  const baseline = useRef<string | null>(null)
 
   // Réinitialisation à chaque ouverture, selon le mode.
   useEffect(() => {
     if (!open) return
     setConfirmDelete(false)
+    setConfirmAbandon(false)
+
+    const apply = (next: FormValues) => {
+      setAmount(next.amount)
+      setCategoryId(next.categoryId)
+      setMerchantId(next.merchantId)
+      setDescription(next.description)
+      setDate(next.date)
+      setType(next.type)
+      setStatus(next.status)
+      setPlannedAmount(next.plannedAmount)
+      setNote(next.note)
+      setConfidential(next.confidential)
+      setRecurringId(next.recurringId)
+      baseline.current = signatureOf(next)
+    }
 
     if (mode.kind === 'edit') {
       const e = mode.expense
-      setAmount(e.amount)
-      setCategoryId(e.categoryId)
-      setMerchantId(e.merchantId)
-      setDescription(e.description)
-      setDate(e.date)
-      setType(e.type)
-      setStatus(e.status)
-      setPlannedAmount(e.plannedAmount)
-      setNote(e.note)
-      setConfidential(e.confidential)
-      setRecurringId(e.recurringId)
+      apply({
+        amount: e.amount,
+        categoryId: e.categoryId,
+        merchantId: e.merchantId,
+        description: e.description,
+        date: e.date,
+        type: e.type,
+        status: e.status,
+        plannedAmount: e.plannedAmount,
+        note: e.note,
+        confidential: e.confidential,
+        recurringId: e.recurringId,
+      })
       setShowDetails(e.plannedAmount !== null || e.note !== '' || e.confidential)
       return
     }
@@ -86,17 +146,19 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
       const item = data.recurring.find((row) => row.id === mode.recurringId)
       if (item) {
         const day = String(Math.min(item.dayOfMonth, 28)).padStart(2, '0')
-        setAmount(item.plannedAmount)
-        setCategoryId(item.categoryId)
-        setMerchantId(item.merchantId)
-        setDescription(item.description)
-        setDate(`${data.year}-${String(data.month).padStart(2, '0')}-${day}`)
-        setType(item.type)
-        setStatus('paye')
-        setPlannedAmount(item.plannedAmount)
-        setNote(item.note)
-        setConfidential(item.confidential)
-        setRecurringId(item.id)
+        apply({
+          amount: item.plannedAmount,
+          categoryId: item.categoryId,
+          merchantId: item.merchantId,
+          description: item.description,
+          date: `${data.year}-${String(data.month).padStart(2, '0')}-${day}`,
+          type: item.type,
+          status: 'paye',
+          plannedAmount: item.plannedAmount,
+          note: item.note,
+          confidential: item.confidential,
+          recurringId: item.id,
+        })
         setShowDetails(false)
       }
       return
@@ -106,22 +168,21 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
     const today = new Date()
     const isCurrentMonth =
       today.getFullYear() === data.year && today.getMonth() + 1 === data.month
-    setAmount(0)
-    setCategoryId('')
-    setMerchantId('')
-    setDescription('')
-    setDate(
-      mode.date ??
-        (isCurrentMonth
-          ? todayISO()
-          : `${data.year}-${String(data.month).padStart(2, '0')}-01`),
-    )
-    setType('variable')
-    setStatus('paye')
-    setPlannedAmount(null)
-    setNote('')
-    setConfidential(false)
-    setRecurringId(null)
+    apply({
+      amount: 0,
+      categoryId: '',
+      merchantId: '',
+      description: '',
+      date:
+        mode.date ??
+        (isCurrentMonth ? todayISO() : `${data.year}-${String(data.month).padStart(2, '0')}-01`),
+      type: 'variable',
+      status: 'paye',
+      plannedAmount: null,
+      note: '',
+      confidential: false,
+      recurringId: null,
+    })
     setShowDetails(false)
   }, [open, mode, data.recurring, data.year, data.month])
 
@@ -142,6 +203,37 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
   }, [amount, plannedAmount])
 
   const canSave = amount > 0 && categoryId !== ''
+
+  const current = signatureOf({
+    amount,
+    categoryId,
+    merchantId,
+    description,
+    date,
+    type,
+    status,
+    plannedAmount,
+    note,
+    confidential,
+    recurringId,
+  })
+  const isDirty = baseline.current !== null && baseline.current !== current
+
+  /**
+   * Toucher le fond de la feuille, ou presser Échap, la referme. Sur une
+   * saisie déjà entamée ce geste effacerait tout sans un mot : on demande
+   * alors confirmation, et seulement dans ce cas.
+   */
+  // Mémorisée : `Sheet` réinstalle son verrou de défilement à chaque
+  // changement de `onClose`, ce qui ferait sauter la page à chaque frappe si
+  // l'identité de cette fonction changeait à chaque rendu.
+  const requestClose = useCallback(() => {
+    if (isDirty) {
+      setConfirmAbandon(true)
+      return
+    }
+    onClose()
+  }, [isDirty, onClose])
 
   const save = async () => {
     if (!canSave) return
@@ -173,6 +265,7 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
 
   const remove = async () => {
     if (mode.kind !== 'edit') return
+    setConfirmDelete(false)
     await expenseRepository.remove(mode.expense.id)
     haptic('warning')
     await data.refresh()
@@ -185,7 +278,7 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
       open={open}
       tall
       title={isEditing ? 'Modifier la dépense' : 'Nouvelle dépense'}
-      onClose={onClose}
+      onClose={requestClose}
       action={{
         label: isEditing ? 'Enregistrer' : 'Ajouter',
         onClick: () => void save(),
@@ -332,29 +425,36 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
         ) : null}
 
         {isEditing ? (
-          confirmDelete ? (
-            <div className="editor__confirm">
-              <p>Supprimer définitivement cette dépense ?</p>
-              <div className="editor__confirm-actions">
-                <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-                  Annuler
-                </Button>
-                <Button variant="danger" onClick={() => void remove()}>
-                  Supprimer
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button
-              variant="danger"
-              block
-              icon={<Icon name="trash" size={17} />}
-              onClick={() => setConfirmDelete(true)}
-            >
-              Supprimer cette dépense
-            </Button>
-          )
+          <Button
+            variant="danger"
+            block
+            icon={<Icon name="trash" size={17} />}
+            onClick={() => setConfirmDelete(true)}
+          >
+            Supprimer cette dépense
+          </Button>
         ) : null}
+
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Supprimer cette dépense ?"
+          warning="Cette action est irréversible."
+          confirmLabel="Supprimer"
+          onConfirm={() => void remove()}
+          onCancel={() => setConfirmDelete(false)}
+        />
+
+        <ConfirmDialog
+          open={confirmAbandon}
+          title={isEditing ? 'Abandonner les modifications ?' : 'Abandonner cette dépense ?'}
+          warning="Ce qui a été saisi sera perdu."
+          confirmLabel="Abandonner"
+          onConfirm={() => {
+            setConfirmAbandon(false)
+            onClose()
+          }}
+          onCancel={() => setConfirmAbandon(false)}
+        />
       </div>
     </Sheet>
   )

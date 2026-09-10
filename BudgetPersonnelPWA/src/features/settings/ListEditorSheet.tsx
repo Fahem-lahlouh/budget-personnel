@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from '@/components/Sheet'
-import { Button, IconButton } from '@/components/Button'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { IconButton } from '@/components/Button'
 import { Icon } from '@/design-system/Icon'
 import { useData } from '@/app/DataContext'
 import { useToast } from '@/app/ToastContext'
@@ -205,23 +206,19 @@ export function ListEditorSheet({ open, kind, onClose }: ListEditorSheetProps) {
           ))}
         </ul>
 
-        {pendingDelete ? (
-          <div className="settings__confirm">
-            <p>
-              {pendingDelete.usage > 0
-                ? `${pendingDelete.usage} dépense${pendingDelete.usage > 1 ? 's utilisent' : ' utilise'} cette ${noun}. Elle${pendingDelete.usage > 1 ? 's' : ''} resteront dans l’historique, mais sans ${noun}.`
-                : `Supprimer cette ${noun} ?`}
-            </p>
-            <div className="settings__confirm-actions">
-              <Button variant="ghost" onClick={() => setPendingDelete(null)}>
-                Annuler
-              </Button>
-              <Button variant="danger" onClick={() => void confirmDelete()}>
-                Supprimer
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          title={`Supprimer cette ${noun} ?`}
+          message={
+            pendingDelete && pendingDelete.usage > 0
+              ? `${pendingDelete.usage} dépense${pendingDelete.usage > 1 ? 's l’utilisent' : ' l’utilise'}. Elle${pendingDelete.usage > 1 ? 's' : ''} rester${pendingDelete.usage > 1 ? 'ont' : 'a'} dans l’historique, mais sans ${noun}.`
+              : undefined
+          }
+          warning="Cette action est irréversible."
+          confirmLabel="Supprimer"
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setPendingDelete(null)}
+        />
       </div>
     </Sheet>
   )

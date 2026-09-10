@@ -276,3 +276,95 @@ describe('sauvegarde et tickets', () => {
     expect(await db.receipts.count()).toBe(0)
   })
 })
+
+// Le « Annuler » proposé après une suppression n'a de valeur que s'il rend
+// exactement ce qui a été retiré : la dépense, son ticket et sa photo, sous
+// leurs identifiants d'origine — sinon les liens se défont en silence.
+describe('annulation d’une suppression de dépense', () => {
+  beforeEach(async () => {
+    await db.delete()
+    await db.open()
+    await bootstrap(new Date(2026, 8, 15))
+  })
+
+  async function makeExpenseWithReceipt() {
+    const [category] = await db.categories.toArray()
+    const expense = await expenseRepository.create({
+      date: '2026-09-12',
+      categoryId: category.id,
+      merchantId: '',
+      description: 'Auchan',
+      amount: 5.57,
+      type: 'variable',
+      plannedAmount: null,
+      status: 'paye',
+      note: '',
+      confidential: false,
+      recurringId: null,
+    })
+    const receipt = await receiptRepository.create({
+      expenseId: expense.id,
+      merchantName: 'Auchan',
+      purchasedAt: '2026-09-12',
+      total: 5.57,
+      items: [{ label: 'Coca-Cola', quantity: null, unitPrice: null, totalPrice: 2.15 }],
+      rawText: 'AUCHAN',
+      image: new Blob(['photo'], { type: 'image/jpeg' }),
+    })
+    return { expense, receipt }
+  }
+
+  it('rend de quoi restaurer ce qui vient d’être supprimé', async () => {
+    const { expense, receipt } = await makeExpenseWithReceipt()
+
+    const deleted = await expenseRepository.remove(expense.id)
+
+    expect(deleted?.expense.id).toBe(expense.id)
+    expect(deleted?.receipt?.id).toBe(receipt.id)
+    expect(deleted?.image?.byteSize).toBe(5)
+  })
+
+  it('remet la dépense, son ticket et sa photo sous les mêmes identifiants', async () => {
+    const { expense, receipt } = await makeExpenseWithReceipt()
+    const deleted = await expenseRepository.remove(expense.id)
+    expect(await expenseRepository.get(expense.id)).toBeUndefined()
+
+    await expenseRepository.restore(deleted!)
+
+    const restored = await expenseRepository.get(expense.id)
+    expect(restored).toEqual(expense)
+
+    const restoredReceipt = await receiptRepository.forExpense(expense.id)
+    expect(restoredReceipt?.id).toBe(receipt.id)
+    expect(restoredReceipt?.items[0].label).toBe('Coca-Cola')
+    expect(await receiptImageRepository.count()).toBe(1)
+  })
+
+  it('reste sans effet sur une dépense déjà absente', async () => {
+    expect(await expenseRepository.remove('exp-inexistante')).toBeNull()
+  })
+
+  it('restaure une dépense qui n’avait pas de ticket', async () => {
+    const [category] = await db.categories.toArray()
+    const expense = await expenseRepository.create({
+      date: '2026-09-12',
+      categoryId: category.id,
+      merchantId: '',
+      description: 'Sans ticket',
+      amount: 12,
+      type: 'variable',
+      plannedAmount: null,
+      status: 'paye',
+      note: '',
+      confidential: false,
+      recurringId: null,
+    })
+
+    const deleted = await expenseRepository.remove(expense.id)
+    expect(deleted?.receipt).toBeNull()
+    await expenseRepository.restore(deleted!)
+
+    expect(await expenseRepository.get(expense.id)).toEqual(expense)
+    expect(await db.receipts.count()).toBe(0)
+  })
+})
