@@ -6,6 +6,7 @@ import { AmountText } from '@/components/AmountText'
 import { Button, IconButton } from '@/components/Button'
 import { MonthSwitcher } from '@/components/MonthSwitcher'
 import { Sheet } from '@/components/Sheet'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Icon } from '@/design-system/Icon'
 import { categoryColor } from '@/design-system/colors'
 import { useSwipe } from '@/hooks/useSwipe'
@@ -40,6 +41,7 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [merchantFilter, setMerchantFilter] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState<'category' | 'merchant' | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Expense | null>(null)
 
   const swipe = useSwipe((direction) => data.shiftPeriod(direction))
 
@@ -125,11 +127,26 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
     await data.refresh()
   }
 
-  const remove = async (expense: Expense) => {
-    haptic('warning')
-    await expenseRepository.remove(expense.id)
+  /**
+   * La corbeille jouxte le bouton « payé » sur chaque ligne : au pouce, la
+   * confirmation est ce qui sépare un geste imprécis d'une perte de saisie.
+   * Le « Annuler » du bandeau rattrape le cas où l'on a confirmé trop vite.
+   */
+  const confirmRemove = async (expense: Expense) => {
+    setPendingDelete(null)
+    const deleted = await expenseRepository.remove(expense.id)
     await data.refresh()
-    notify('Dépense supprimée')
+    if (!deleted) return
+    notify('Dépense supprimée', 'neutral', {
+      label: 'Annuler',
+      onAct: () => {
+        void (async () => {
+          await expenseRepository.restore(deleted)
+          await data.refresh()
+          notify('Dépense rétablie', 'success')
+        })()
+      },
+    })
   }
 
   return (
@@ -266,7 +283,7 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
                       )}
                       onEdit={() => onEdit(expense)}
                       onToggleStatus={() => void toggleStatus(expense)}
-                      onDelete={() => void remove(expense)}
+                      onDelete={() => setPendingDelete(expense)}
                     />
                   ))}
                 </ul>
@@ -298,6 +315,24 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Supprimer cette dépense ?"
+        // Le montant est délibérément absent : il est masqué partout ailleurs
+        // quand la confidentialité le protège, et une modale ne doit pas être
+        // la fuite par laquelle il s'affiche. Le libellé et la date suffisent
+        // à reconnaître la ligne que l'on s'apprête à supprimer.
+        message={
+          pendingDelete
+            ? `${pendingDelete.description || data.categoryName(pendingDelete.categoryId) || 'Dépense'} · ${formatWeekday(pendingDelete.date)}`
+            : undefined
+        }
+        warning="Cette action est irréversible."
+        confirmLabel="Supprimer"
+        onConfirm={() => pendingDelete && void confirmRemove(pendingDelete)}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <Sheet
         open={pickerOpen === 'category'}

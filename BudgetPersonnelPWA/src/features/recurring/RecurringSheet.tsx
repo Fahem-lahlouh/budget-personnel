@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from '@/components/Sheet'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { AmountInput, Segmented, Switch, TextField } from '@/components/Field'
 import { Button } from '@/components/Button'
 import { AmountText } from '@/components/AmountText'
@@ -163,6 +164,7 @@ function RecurringEditor({
 
   const remove = async () => {
     if (!item) return
+    setConfirmDelete(false)
     await recurringRepository.remove(item.id)
     await data.refresh()
     notify('Récurrente supprimée')
@@ -264,24 +266,25 @@ function RecurringEditor({
         />
 
         {item ? (
-          confirmDelete ? (
-            <div className="settings__confirm">
-              <p>Supprimer définitivement cette récurrente ?</p>
-              <div className="settings__confirm-actions">
-                <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-                  Annuler
-                </Button>
-                <Button variant="danger" onClick={() => void remove()}>
-                  Supprimer
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button variant="danger" block icon={<Icon name="trash" size={17} />} onClick={() => setConfirmDelete(true)}>
-              Supprimer
-            </Button>
-          )
+          <Button
+            variant="danger"
+            block
+            icon={<Icon name="trash" size={17} />}
+            onClick={() => setConfirmDelete(true)}
+          >
+            Supprimer
+          </Button>
         ) : null}
+
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Supprimer cette récurrente ?"
+          message="Les dépenses déjà saisies depuis ce modèle sont conservées."
+          warning="Cette action est irréversible."
+          confirmLabel="Supprimer"
+          onConfirm={() => void remove()}
+          onCancel={() => setConfirmDelete(false)}
+        />
       </div>
     </Sheet>
   )

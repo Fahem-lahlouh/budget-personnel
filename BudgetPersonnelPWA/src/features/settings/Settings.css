@@ -66,23 +66,6 @@
   border-radius: var(--radius-inner);
 }
 
-.settings__confirm {
-  padding: 14px;
-  background: var(--negative-soft);
-  border-radius: var(--radius-inner);
-}
-
-.settings__confirm p {
-  margin: 0 0 10px;
-  font-size: 13.5px;
-}
-
-.settings__confirm-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
 /* Éditeur de listes */
 
 .list-editor__add {
@@ -237,51 +220,6 @@
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--text-secondary);
-}
-
-/* Confirmation modale */
-
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 250;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: var(--overlay);
-  animation: sheet-fade var(--dur) var(--ease);
-}
-
-.confirm-box {
-  width: min(360px, 100%);
-  padding: 22px;
-  background: var(--surface);
-  border-radius: 20px;
-  box-shadow: var(--shadow-raised);
-}
-
-.confirm-box h2 {
-  margin: 0 0 8px;
-  font-size: 17px;
-  font-weight: 650;
-}
-
-.confirm-box p {
-  margin: 0 0 8px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.confirm-box__warning {
-  color: var(--negative);
-  font-weight: 550;
-}
-
-.confirm-box__actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 16px;
 }
 
 .import-history__row {

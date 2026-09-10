@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Sheet } from '@/components/Sheet'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { AmountInput, DateField, Segmented, Switch, TextField } from '@/components/Field'
 import { Button } from '@/components/Button'
 import { Icon } from '@/design-system/Icon'
@@ -173,6 +174,7 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
 
   const remove = async () => {
     if (mode.kind !== 'edit') return
+    setConfirmDelete(false)
     await expenseRepository.remove(mode.expense.id)
     haptic('warning')
     await data.refresh()
@@ -332,29 +334,24 @@ export function ExpenseEditor({ open, mode, onClose }: ExpenseEditorProps) {
         ) : null}
 
         {isEditing ? (
-          confirmDelete ? (
-            <div className="editor__confirm">
-              <p>Supprimer définitivement cette dépense ?</p>
-              <div className="editor__confirm-actions">
-                <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-                  Annuler
-                </Button>
-                <Button variant="danger" onClick={() => void remove()}>
-                  Supprimer
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button
-              variant="danger"
-              block
-              icon={<Icon name="trash" size={17} />}
-              onClick={() => setConfirmDelete(true)}
-            >
-              Supprimer cette dépense
-            </Button>
-          )
+          <Button
+            variant="danger"
+            block
+            icon={<Icon name="trash" size={17} />}
+            onClick={() => setConfirmDelete(true)}
+          >
+            Supprimer cette dépense
+          </Button>
         ) : null}
+
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Supprimer cette dépense ?"
+          warning="Cette action est irréversible."
+          confirmLabel="Supprimer"
+          onConfirm={() => void remove()}
+          onCancel={() => setConfirmDelete(false)}
+        />
       </div>
     </Sheet>
   )

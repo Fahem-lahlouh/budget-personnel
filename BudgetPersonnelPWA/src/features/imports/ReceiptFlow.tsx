@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { useData } from '@/app/DataContext'
 import { useToast } from '@/app/ToastContext'
 import { Sheet } from '@/components/Sheet'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Card, SectionHeader, TagChip } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { AmountInput, DateField, TextField } from '@/components/Field'
@@ -73,6 +74,7 @@ export function ReceiptFlow({ open, onClose }: ReceiptFlowProps) {
   const [memorize, setMemorize] = useState(true)
   const [isDuplicate, setIsDuplicate] = useState(false)
   const [photo, setPhoto] = useState<Blob | null>(null)
+  const [confirmAbandon, setConfirmAbandon] = useState(false)
 
   const ocrHandleRef = useRef<OcrRunHandle | null>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -96,6 +98,7 @@ export function ReceiptFlow({ open, onClose }: ReceiptFlowProps) {
     setMemorize(true)
     setIsDuplicate(false)
     setPhoto(null)
+    setConfirmAbandon(false)
     ocrHandleRef.current = null
   }, [])
 
@@ -105,10 +108,23 @@ export function ReceiptFlow({ open, onClose }: ReceiptFlowProps) {
     ocrHandleRef.current = null
   }, [])
 
-  const close = () => {
+  const discard = () => {
     ocrHandleRef.current?.cancel()
     reset()
     onClose()
+  }
+
+  /**
+   * Un ticket lu puis corrigé représente un vrai travail : le jeter d'un
+   * toucher à côté de la feuille serait la pire des surprises. On ne demande
+   * qu'au stade de la vérification — avant, il n'y a rien à perdre.
+   */
+  const close = () => {
+    if (step === 'review') {
+      setConfirmAbandon(true)
+      return
+    }
+    discard()
   }
 
   const onFileChosen = async (file: File) => {
@@ -533,6 +549,16 @@ export function ReceiptFlow({ open, onClose }: ReceiptFlowProps) {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmAbandon}
+        title="Abandonner ce ticket ?"
+        message="Le ticket a été lu mais rien n’a encore été enregistré."
+        warning="Les corrections saisies seront perdues."
+        confirmLabel="Abandonner"
+        onConfirm={discard}
+        onCancel={() => setConfirmAbandon(false)}
+      />
     </Sheet>
   )
 }

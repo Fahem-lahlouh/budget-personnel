@@ -40,6 +40,13 @@ function newId(prefix: string): string {
 
 // MARK: - Dépenses
 
+/** Tout ce qu'il faut pour annuler une suppression de dépense. */
+export interface DeletedExpense {
+  expense: Expense
+  receipt: Receipt | null
+  image: ReceiptImage | null
+}
+
 export const expenseRepository = {
   async all(): Promise<Expense[]> {
     return db.expenses.toArray()
@@ -85,15 +92,42 @@ export const expenseRepository = {
     await db.expenses.update(id, next)
   },
 
-  /** Supprime la dépense et, avec elle, le ticket qui la documentait. */
-  async remove(id: string): Promise<void> {
-    await db.transaction('rw', [db.expenses, db.receipts, db.receiptImages], async () => {
-      const receipt = await db.receipts.where('expenseId').equals(id).first()
+  /**
+   * Supprime la dépense et, avec elle, le ticket qui la documentait.
+   *
+   * Retourne de quoi la remettre exactement en place : c'est ce qui permet
+   * d'offrir un « Annuler » après coup plutôt qu'une perte sèche.
+   */
+  async remove(id: string): Promise<DeletedExpense | null> {
+    return db.transaction('rw', [db.expenses, db.receipts, db.receiptImages], async () => {
+      const expense = await db.expenses.get(id)
+      if (!expense) return null
+
+      const receipt = (await db.receipts.where('expenseId').equals(id).first()) ?? null
+      const image = receipt ? ((await db.receiptImages.get(receipt.id)) ?? null) : null
+
       if (receipt) {
         await db.receiptImages.delete(receipt.id)
         await db.receipts.delete(receipt.id)
       }
       await db.expenses.delete(id)
+
+      return { expense, receipt, image }
+    })
+  },
+
+  /**
+   * Remet en place une dépense supprimée, avec son ticket et sa photo.
+   *
+   * Les enregistrements sont réécrits tels quels, identifiants compris : rien
+   * n'est recréé, donc rien ne se désolidarise — le ticket retrouve sa dépense
+   * et la photo son ticket.
+   */
+  async restore(deleted: DeletedExpense): Promise<void> {
+    await db.transaction('rw', [db.expenses, db.receipts, db.receiptImages], async () => {
+      await db.expenses.put(deleted.expense)
+      if (deleted.receipt) await db.receipts.put(deleted.receipt)
+      if (deleted.image) await db.receiptImages.put(deleted.image)
     })
   },
 
