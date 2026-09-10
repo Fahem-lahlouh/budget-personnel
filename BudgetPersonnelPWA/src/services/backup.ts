@@ -1,6 +1,7 @@
 import { db } from '@/repositories/db'
 import { installListsIfNeeded } from '@/repositories'
 import { SCHEMA_VERSION } from '@/models/types'
+import type { Receipt } from '@/models/receipt'
 import type {
   AppSettings,
   Category,
@@ -37,21 +38,35 @@ export interface BackupFile {
     merchants: Merchant[]
     recurring: RecurringExpense[]
     monthBudgets: MonthBudget[]
-    settings: Omit<AppSettings, 'id'> | null
+    /**
+     * Partiel à dessein : un fichier écrit par une version antérieure ne
+     * porte pas les réglages ajoutés depuis. Les absents reprennent la valeur
+     * en place lors de la restauration plutôt que de la remettre à zéro.
+     */
+    settings: Partial<Omit<AppSettings, 'id'>> | null
+    /**
+     * Tickets de caisse, **sans leurs photos** : une image n'a pas sa place
+     * dans un JSON, et la sauvegarde doit rester légère et lisible. Champ
+     * optionnel — un fichier produit avant les tickets n'en a pas, et se
+     * restaure sans erreur.
+     */
+    receipts?: Receipt[]
   }
 }
 
 export const BACKUP_FORMAT_VERSION = 1
 
 export async function createBackup(): Promise<BackupFile> {
-  const [expenses, categories, merchants, recurring, monthBudgets, settings] = await Promise.all([
-    db.expenses.toArray(),
-    db.categories.toArray(),
-    db.merchants.toArray(),
-    db.recurring.toArray(),
-    db.monthBudgets.toArray(),
-    db.settings.get('settings'),
-  ])
+  const [expenses, categories, merchants, recurring, monthBudgets, settings, receipts] =
+    await Promise.all([
+      db.expenses.toArray(),
+      db.categories.toArray(),
+      db.merchants.toArray(),
+      db.recurring.toArray(),
+      db.monthBudgets.toArray(),
+      db.settings.get('settings'),
+      db.receipts.toArray(),
+    ])
 
   const { id: _id, ...settingsWithoutId } = settings ?? { id: 'settings' as const }
 
@@ -67,6 +82,8 @@ export async function createBackup(): Promise<BackupFile> {
       recurring,
       monthBudgets,
       settings: settings ? (settingsWithoutId as Omit<AppSettings, 'id'>) : null,
+      // La photo reste sur l'appareil : seul le détail lu du ticket voyage.
+      receipts: receipts.map((receipt) => ({ ...receipt, hasImage: false })),
     },
   }
 }
@@ -168,7 +185,16 @@ export async function restoreBackup(backup: BackupFile): Promise<void> {
 
   await db.transaction(
     'rw',
-    [db.expenses, db.categories, db.merchants, db.recurring, db.monthBudgets, db.settings],
+    [
+      db.expenses,
+      db.categories,
+      db.merchants,
+      db.recurring,
+      db.monthBudgets,
+      db.settings,
+      db.receipts,
+      db.receiptImages,
+    ],
     async () => {
       await Promise.all([
         db.expenses.clear(),
@@ -176,6 +202,10 @@ export async function restoreBackup(backup: BackupFile): Promise<void> {
         db.merchants.clear(),
         db.recurring.clear(),
         db.monthBudgets.clear(),
+        db.receipts.clear(),
+        // Les photos suivent leurs tickets : en garder après remplacement
+        // laisserait des images rattachées à des tickets disparus.
+        db.receiptImages.clear(),
       ])
 
       await db.expenses.bulkAdd(data.expenses)
@@ -183,6 +213,7 @@ export async function restoreBackup(backup: BackupFile): Promise<void> {
       await db.merchants.bulkAdd(data.merchants)
       await db.recurring.bulkAdd(data.recurring)
       await db.monthBudgets.bulkAdd(data.monthBudgets)
+      if (data.receipts?.length) await db.receipts.bulkAdd(data.receipts)
 
       const current = await db.settings.get('settings')
       await db.settings.put({

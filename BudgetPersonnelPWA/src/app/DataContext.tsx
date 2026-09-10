@@ -23,6 +23,7 @@ import {
   monthBudgetRepository,
   recurringRepository,
   settingsRepository,
+  receiptRepository,
 } from '@/repositories'
 import { requestPersistentStorage } from '@/repositories/db'
 
@@ -47,6 +48,13 @@ interface DataContextValue {
   /** Dépenses de l'année sélectionnée. */
   expenses: Expense[]
   settings: AppSettings | null
+  /**
+   * Libellés des articles de chaque ticket, indexés par dépense, pour que la
+   * recherche retrouve une dépense à partir de ce qu'elle contient
+   * (« coca » → le passage en caisse chez Auchan). Seul ce texte est gardé en
+   * mémoire : les tickets complets et leurs photos restent en base.
+   */
+  receiptSearch: Map<string, string>
   setPeriod: (year: number, month: number) => void
   shiftPeriod: (deltaMonths: number) => void
   goToToday: () => void
@@ -73,23 +81,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<MonthBudget[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [receiptSearch, setReceiptSearch] = useState<Map<string, string>>(() => new Map())
 
   const load = useCallback(async (targetYear: number) => {
-    const [nextCategories, nextMerchants, nextRecurring, nextBudgets, nextExpenses, nextSettings] =
-      await Promise.all([
-        categoryRepository.all(),
-        merchantRepository.all(),
-        recurringRepository.all(),
-        monthBudgetRepository.all(),
-        expenseRepository.forYear(targetYear),
-        settingsRepository.get(),
-      ])
+    const [
+      nextCategories,
+      nextMerchants,
+      nextRecurring,
+      nextBudgets,
+      nextExpenses,
+      nextSettings,
+      nextReceipts,
+    ] = await Promise.all([
+      categoryRepository.all(),
+      merchantRepository.all(),
+      recurringRepository.all(),
+      monthBudgetRepository.all(),
+      expenseRepository.forYear(targetYear),
+      settingsRepository.get(),
+      receiptRepository.all(),
+    ])
     setCategories(nextCategories)
     setMerchants(nextMerchants)
     setRecurring(nextRecurring)
     setBudgets(nextBudgets)
     setExpenses(nextExpenses)
     setSettings(nextSettings)
+    setReceiptSearch(
+      new Map(nextReceipts.map((receipt) => [receipt.expenseId, receipt.searchIndex])),
+    )
   }, [])
 
   // Amorçage : listes de référence, jeu de démonstration au premier lancement,
@@ -165,6 +185,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       budgets,
       expenses,
       settings,
+      receiptSearch,
       setPeriod,
       shiftPeriod,
       goToToday,
@@ -177,7 +198,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready, year, month, categories, merchants, recurring, budgets, expenses, settings,
-      setPeriod, shiftPeriod, goToToday, categoryIndex, merchantIndex, budgetIndex,
+      receiptSearch, setPeriod, shiftPeriod, goToToday, categoryIndex, merchantIndex, budgetIndex,
       refresh, updateSettings,
     ],
   )

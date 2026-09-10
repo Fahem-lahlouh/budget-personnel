@@ -13,6 +13,8 @@ import { SettingsScreen } from '@/features/settings/SettingsScreen'
 import { LockScreen } from '@/features/security/LockScreen'
 import { AddOptionsSheet } from '@/features/imports/AddOptionsSheet'
 import { ImportFlow } from '@/features/imports/ImportFlow'
+import { ReceiptFlow } from '@/features/imports/ReceiptFlow'
+import { ExpenseDetailSheet } from '@/features/expenses/ExpenseDetailSheet'
 import { Sheet } from '@/components/Sheet'
 import { YearOverview } from '@/features/year/YearOverview'
 import { summarizeYear } from '@/services/budgetEngine'
@@ -49,6 +51,8 @@ function Shell() {
   const [yearOpen, setYearOpen] = useState(false)
   const [addOptionsOpen, setAddOptionsOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [receiptOpen, setReceiptOpen] = useState(false)
+  const [detail, setDetail] = useState<Expense | null>(null)
 
   // Applique le thème choisi à la racine du document.
   useEffect(() => {
@@ -76,7 +80,9 @@ function Shell() {
     )
   }
 
-  const openEditorForExpense = (expense: Expense) => setEditor({ kind: 'edit', expense })
+  // Ouvrir une dépense montre son détail (et son ticket) ; la modification
+  // reste accessible depuis là, d'un bouton.
+  const openDetailForExpense = (expense: Expense) => setDetail(expense)
 
   return (
     <div className="app-shell">
@@ -89,7 +95,7 @@ function Shell() {
       ) : null}
 
       {tab === 'expenses' ? (
-        <ExpensesScreen onAdd={() => setEditor({ kind: 'create' })} onEdit={openEditorForExpense} />
+        <ExpensesScreen onAdd={() => setEditor({ kind: 'create' })} onEdit={openDetailForExpense} />
       ) : null}
 
       {tab === 'analytics' ? <AnalyticsScreen /> : null}
@@ -114,9 +120,24 @@ function Shell() {
           setAddOptionsOpen(false)
           setImportOpen(true)
         }}
+        onReceipt={() => {
+          setAddOptionsOpen(false)
+          setReceiptOpen(true)
+        }}
       />
 
       <ImportFlow open={importOpen} onClose={() => setImportOpen(false)} />
+      <ReceiptFlow open={receiptOpen} onClose={() => setReceiptOpen(false)} />
+
+      <ExpenseDetailSheet
+        open={detail !== null}
+        expense={detail}
+        onClose={() => setDetail(null)}
+        onEdit={(expense) => {
+          setDetail(null)
+          setEditor({ kind: 'edit', expense })
+        }}
+      />
 
       <Sheet open={yearOpen} tall title={`Année ${data.year}`} onClose={() => setYearOpen(false)}>
         <div style={{ paddingTop: 12 }}>

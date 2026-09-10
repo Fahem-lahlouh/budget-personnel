@@ -183,6 +183,11 @@ export interface AppSettings {
   protectedFields: Record<PrivacyKey, boolean>
   /** Combien de temps un champ révélé reste visible avant de se remasquer. */
   unlockDuration: UnlockDuration
+  /**
+   * Conserver la photo des tickets scannés, en plus du détail extrait.
+   * Coupé, l'OCR tourne toujours mais l'image est jetée une fois lue.
+   */
+  keepReceiptImages: boolean
   /** Le jeu de démonstration a déjà été installé (ne pas le réinjecter). */
   demoSeeded: boolean
 }

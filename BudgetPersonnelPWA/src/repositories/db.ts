@@ -16,6 +16,7 @@ import type {
   ImportedTransaction,
   MerchantAlias,
 } from '@/models/import'
+import type { Receipt, ReceiptImage } from '@/models/receipt'
 
 /**
  * Base IndexedDB de l'application.
@@ -44,6 +45,9 @@ export class BudgetDatabase extends Dexie {
   importedTransactions!: EntityTable<ImportedTransaction, 'id'>
   merchantAliases!: EntityTable<MerchantAlias, 'id'>
   categorizationRules!: EntityTable<CategorizationRule, 'id'>
+  // Tickets de caisse photographiés : le détail, et la photo à part.
+  receipts!: EntityTable<Receipt, 'id'>
+  receiptImages!: EntityTable<ReceiptImage, 'id'>
 
   constructor(name = 'budget-personnel') {
     super(name)
@@ -69,6 +73,15 @@ export class BudgetDatabase extends Dexie {
       merchantAliases: 'id, &normalizedPattern, merchantId',
       categorizationRules: 'id, &normalizedPattern, merchantId, categoryId',
     })
+
+    // v3 : tickets de caisse photographiés. Deux tables neuves, aucune colonne
+    // ajoutée aux dépenses : une dépense d'avant cette version reste valide
+    // telle quelle, simplement sans ticket. Les photos sont à part pour que
+    // lister les tickets ne charge pas les images avec.
+    this.version(3).stores({
+      receipts: 'id, &expenseId, createdAt',
+      receiptImages: 'id, receiptId',
+    })
   }
 }
 
@@ -85,6 +98,7 @@ export function defaultSettings(): AppSettings {
     pinLength: 6,
     protectedFields: { ...DEFAULT_PROTECTED_FIELDS },
     unlockDuration: 'background',
+    keepReceiptImages: true,
     demoSeeded: false,
   }
 }
