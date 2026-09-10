@@ -34,6 +34,22 @@ export function parseFrenchAmount(raw: string): ParsedAmount | null {
   return { value, sign }
 }
 
+/**
+ * Date telle qu'elle apparaît dans un relevé : à la française (`jj/mm`,
+ * `jj/mm/aaaa`) comme sur un relevé imprimé, ou déjà en ISO (`aaaa-mm-jj`)
+ * comme l'écrivent la plupart des applications bancaires mobiles.
+ */
+export function parseStatementDate(raw: string, referenceYear: number): string | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim())
+  if (!iso) return parseFrenchDate(raw, referenceYear)
+
+  const [, year, month, day] = iso
+  const monthNumber = Number.parseInt(month, 10)
+  const dayNumber = Number.parseInt(day, 10)
+  if (monthNumber < 1 || monthNumber > 12 || dayNumber < 1 || dayNumber > 31) return null
+  return `${year}-${month}-${day}`
+}
+
 /** Date française jj/mm ou jj/mm/aaaa (année sur 2 ou 4 chiffres) → ISO `aaaa-mm-jj`. */
 export function parseFrenchDate(raw: string, referenceYear: number): string | null {
   const match = /^(\d{2})\/(\d{2})(?:\/(\d{2,4}))?$/.exec(raw.trim())

@@ -196,7 +196,18 @@ export function ImportFlow({ open, onClose }: ImportFlowProps) {
   }
 
   const updateRow = (tempId: string, patch: Partial<ReviewRow>) => {
-    setRows((current) => current.map((row) => (row.tempId === tempId ? { ...row, ...patch } : row)))
+    setRows((current) =>
+      current.map((row) => {
+        if (row.tempId !== tempId) return row
+        const updated = { ...row, ...patch }
+        // Renseigner ce qui manquait vaut sélection : sans cela il faudrait
+        // encore toucher « Valider » sur une ligne qu'on vient de compléter.
+        if (!canValidateRow(row) && canValidateRow(updated) && !updated.isDuplicate) {
+          updated.decision = 'valider'
+        }
+        return updated
+      }),
+    )
   }
 
   const selectableRows = rows.filter((row) => !row.isDuplicate && canValidateRow(row))
@@ -376,6 +387,16 @@ export function ImportFlow({ open, onClose }: ImportFlowProps) {
               </Button>
             </div>
           </div>
+
+          {/* Au tout premier import, l'app n'a encore rien appris : aucune ligne
+              n'a de catégorie, donc aucune n'est importable. Sans un mot
+              d'explication, l'écran semble bloqué. */}
+          {rows.length > 0 && selectableRows.length === 0 ? (
+            <p className="import-flow__hint">
+              Une catégorie est nécessaire pour enregistrer une dépense. Touchez « Compléter »
+              sur une ligne pour la choisir — les suivantes seront reconnues toutes seules.
+            </p>
+          ) : null}
 
           {rows.length === 0 ? (
             <Card>
