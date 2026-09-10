@@ -63,6 +63,9 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
         data.categoryName(expense.categoryId) ?? '',
         data.merchantName(expense.merchantId) ?? '',
         expense.note,
+        // Les articles du ticket : chercher « coca » doit ramener le passage
+        // en caisse où il figure, même si la dépense s'appelle « Auchan ».
+        data.receiptSearch.get(expense.id) ?? '',
       ]
         .join(' ')
         .toLocaleLowerCase('fr')
@@ -146,7 +149,7 @@ export function ExpensesScreen({ onAdd, onEdit }: ExpensesScreenProps) {
           <input
             type="search"
             className="search__input"
-            placeholder="Rechercher une dépense, une enseigne…"
+            placeholder="Rechercher une dépense, une enseigne, un article…"
             value={search}
             aria-label="Rechercher une dépense"
             onChange={(event) => setSearch(event.target.value)}

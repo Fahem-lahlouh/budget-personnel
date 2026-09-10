@@ -170,6 +170,7 @@ describe('restoreBackup', () => {
       pinLength: 6,
       protectedFields: DEFAULT_PROTECTED_FIELDS,
       unlockDuration: 'background',
+      keepReceiptImages: true,
       demoSeeded: true,
     })
 

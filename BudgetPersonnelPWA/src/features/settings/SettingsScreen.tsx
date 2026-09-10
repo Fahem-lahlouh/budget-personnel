@@ -20,6 +20,7 @@ import {
 import { downloadBlob, readJsonFile } from '@/utils/download'
 import { resetToDemoData, wipeAllData } from '@/repositories'
 import { storageEstimate, requestPersistentStorage } from '@/repositories/db'
+import { receiptImageRepository } from '@/repositories'
 import { bytes, plural } from '@/services/format'
 import {
   UNLOCK_DURATIONS,
@@ -40,6 +41,7 @@ type Dialog =
   | null
   | { kind: 'wipe' }
   | { kind: 'reseed' }
+  | { kind: 'deletePhotos'; count: number }
   | { kind: 'import'; summary: BackupSummary; apply: () => Promise<void> }
 
 /** Écran des réglages. */
@@ -59,12 +61,16 @@ export function SettingsScreen() {
   )
   const [dialog, setDialog] = useState<Dialog>(null)
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null)
+  const [photos, setPhotos] = useState<{ count: number; bytes: number } | null>(null)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [biometricsAvailable, setBiometricsAvailable] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     void storageEstimate().then(setStorage)
+    void Promise.all([receiptImageRepository.count(), receiptImageRepository.totalBytes()]).then(
+      ([count, byteSize]) => setPhotos({ count, bytes: byteSize }),
+    )
     void navigator.storage?.persisted?.().then(setPersisted).catch(() => setPersisted(null))
     void isPlatformAuthenticatorAvailable().then(setBiometricsAvailable)
   }, [])
@@ -196,6 +202,12 @@ export function SettingsScreen() {
   const askReseed = async () => {
     if (!(await requireConfirm())) return
     setDialog({ kind: 'reseed' })
+  }
+
+  const askDeletePhotos = async () => {
+    if (!photos || photos.count === 0) return
+    if (!(await requireConfirm())) return
+    setDialog({ kind: 'deletePhotos', count: photos.count })
   }
 
   return (
@@ -417,6 +429,29 @@ export function SettingsScreen() {
                 Demander le stockage persistant
               </Button>
             ) : null}
+
+            <Switch
+              label="Conserver la photo des tickets"
+              description="Coupé, les tickets sont toujours lus et détaillés, mais la photo est jetée après lecture."
+              checked={settings.keepReceiptImages}
+              onChange={(checked) => void data.updateSettings({ keepReceiptImages: checked })}
+            />
+
+            {photos && photos.count > 0 ? (
+              <>
+                <div className="settings__stat">
+                  <span>Photos de tickets</span>
+                  <span className="tnum">
+                    {photos.count} · {bytes(photos.bytes)}
+                  </span>
+                </div>
+                {/* Supprimer les photos ne touche pas aux articles déjà
+                    extraits : on récupère de la place sans perdre le détail. */}
+                <Button variant="ghost" block onClick={() => void askDeletePhotos()}>
+                  Supprimer les photos conservées
+                </Button>
+              </>
+            ) : null}
           </div>
         </Card>
 
@@ -499,6 +534,14 @@ export function SettingsScreen() {
                   cours.
                 </p>
               </>
+            ) : dialog.kind === 'deletePhotos' ? (
+              <>
+                <h2>Supprimer {dialog.count} photo{dialog.count > 1 ? 's' : ''} ?</h2>
+                <p>
+                  Les articles et les montants déjà extraits de ces tickets sont conservés : seule
+                  l’image disparaît.
+                </p>
+              </>
             ) : (
               <>
                 <h2>Restaurer cette sauvegarde ?</h2>
@@ -533,6 +576,11 @@ export function SettingsScreen() {
                       await resetToDemoData()
                       await data.refresh()
                       notify('Démonstration rechargée', 'success')
+                    } else if (dialog.kind === 'deletePhotos') {
+                      await receiptImageRepository.removeAll()
+                      setPhotos({ count: 0, bytes: 0 })
+                      await data.refresh()
+                      notify('Photos supprimées')
                     } else {
                       await dialog.apply()
                     }

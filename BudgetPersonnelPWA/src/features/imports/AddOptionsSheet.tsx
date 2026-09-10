@@ -8,10 +8,17 @@ interface AddOptionsSheetProps {
   onClose: () => void
   onManual: () => void
   onImport: () => void
+  onReceipt: () => void
 }
 
-/** Choix proposé par le bouton « + » : saisie manuelle ou import depuis une image. */
-export function AddOptionsSheet({ open, onClose, onManual, onImport }: AddOptionsSheetProps) {
+/** Choix proposé par le bouton « + » : saisie manuelle, ticket photographié, relevé importé. */
+export function AddOptionsSheet({
+  open,
+  onClose,
+  onManual,
+  onImport,
+  onReceipt,
+}: AddOptionsSheetProps) {
   return (
     <Sheet open={open} title="Ajouter une dépense" onClose={onClose}>
       <ul className="picker-list">
@@ -26,6 +33,19 @@ export function AddOptionsSheet({ open, onClose, onManual, onImport }: AddOption
           >
             <Icon name="plus" size={18} />
             <span>Ajouter manuellement</span>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            className="picker-list__row"
+            onClick={() => {
+              haptic('light')
+              onReceipt()
+            }}
+          >
+            <Icon name="store" size={18} />
+            <span>Photographier un ticket de caisse</span>
           </button>
         </li>
         <li>

@@ -21,6 +21,8 @@ import type {
   ImportedTransaction,
   MerchantAlias,
 } from '@/models/import'
+import type { Receipt, ReceiptImage, ReceiptItem } from '@/models/receipt'
+import { buildSearchIndex } from '@/models/receipt'
 
 /**
  * Accès aux données. Les composants ne parlent jamais à Dexie directement :
@@ -83,8 +85,16 @@ export const expenseRepository = {
     await db.expenses.update(id, next)
   },
 
+  /** Supprime la dépense et, avec elle, le ticket qui la documentait. */
   async remove(id: string): Promise<void> {
-    await db.expenses.delete(id)
+    await db.transaction('rw', [db.expenses, db.receipts, db.receiptImages], async () => {
+      const receipt = await db.receipts.where('expenseId').equals(id).first()
+      if (receipt) {
+        await db.receiptImages.delete(receipt.id)
+        await db.receipts.delete(receipt.id)
+      }
+      await db.expenses.delete(id)
+    })
   },
 
   async countAll(): Promise<number> {
@@ -384,6 +394,102 @@ export const categorizationRuleRepository = {
 // MARK: - Amorçage & réinitialisation
 
 /** Installe les listes de référence si elles sont absentes. */
+// MARK: - Tickets de caisse
+
+export interface NewReceipt {
+  expenseId: string
+  merchantName: string
+  purchasedAt: string | null
+  total: number
+  items: Omit<ReceiptItem, 'id'>[]
+  rawText: string
+  /** Photo à conserver. `null` quand le réglage la refuse ou qu'il n'y en a pas. */
+  image: Blob | null
+}
+
+export const receiptRepository = {
+  async all(): Promise<Receipt[]> {
+    return db.receipts.toArray()
+  },
+
+  async forExpense(expenseId: string): Promise<Receipt | undefined> {
+    return db.receipts.where('expenseId').equals(expenseId).first()
+  },
+
+  /**
+   * Enregistre le ticket et sa photo d'un seul tenant : jamais de photo
+   * orpheline si l'écriture du ticket échoue.
+   */
+  async create(input: NewReceipt): Promise<Receipt> {
+    const id = newId('receipt')
+    const items: ReceiptItem[] = input.items.map((item) => ({ ...item, id: newId('item') }))
+    const receipt: Receipt = {
+      id,
+      expenseId: input.expenseId,
+      merchantName: input.merchantName,
+      purchasedAt: input.purchasedAt,
+      total: input.total,
+      items,
+      rawText: input.rawText,
+      searchIndex: buildSearchIndex(input.merchantName, items),
+      hasImage: input.image !== null,
+      createdAt: new Date().toISOString(),
+    }
+
+    await db.transaction('rw', [db.receipts, db.receiptImages], async () => {
+      await db.receipts.put(receipt)
+      if (input.image) {
+        await db.receiptImages.put({
+          id,
+          receiptId: id,
+          blob: input.image,
+          mimeType: input.image.type || 'image/jpeg',
+          byteSize: input.image.size,
+        })
+      }
+    })
+
+    return receipt
+  },
+
+  async remove(id: string): Promise<void> {
+    await db.transaction('rw', [db.receipts, db.receiptImages], async () => {
+      await db.receiptImages.delete(id)
+      await db.receipts.delete(id)
+    })
+  },
+}
+
+export const receiptImageRepository = {
+  async get(receiptId: string): Promise<ReceiptImage | undefined> {
+    return db.receiptImages.get(receiptId)
+  },
+
+  /** Octets occupés par l'ensemble des photos, pour l'écran Réglages. */
+  async totalBytes(): Promise<number> {
+    let total = 0
+    await db.receiptImages.each((image) => {
+      total += image.byteSize
+    })
+    return total
+  },
+
+  async count(): Promise<number> {
+    return db.receiptImages.count()
+  },
+
+  /**
+   * Supprime toutes les photos en gardant les tickets : couper le réglage ne
+   * doit pas faire perdre le détail des articles déjà extrait.
+   */
+  async removeAll(): Promise<void> {
+    await db.transaction('rw', [db.receipts, db.receiptImages], async () => {
+      await db.receiptImages.clear()
+      await db.receipts.toCollection().modify({ hasImage: false })
+    })
+  },
+}
+
 export async function installListsIfNeeded(): Promise<void> {
   if ((await db.categories.count()) === 0) await db.categories.bulkAdd(SEED_CATEGORIES)
   if ((await db.merchants.count()) === 0) await db.merchants.bulkAdd(SEED_MERCHANTS)
@@ -428,6 +534,8 @@ export async function wipeAllData(): Promise<void> {
       db.importedTransactions,
       db.merchantAliases,
       db.categorizationRules,
+      db.receipts,
+      db.receiptImages,
     ],
     async () => {
       await Promise.all([
@@ -440,6 +548,8 @@ export async function wipeAllData(): Promise<void> {
         db.importedTransactions.clear(),
         db.merchantAliases.clear(),
         db.categorizationRules.clear(),
+        db.receipts.clear(),
+        db.receiptImages.clear(),
       ])
     },
   )
